@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Finance Tracker</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+<!-- ═══ HOME PAGE ═══ -->
+<div id="pg-home">
+  <div class="page">
+    <div class="hero">
+      <div class="hero-icon">💰</div>
+      <h1>My Finance Tracker</h1>
+      <p>Track income, expenses &amp; investments — powered by your bank statement</p>
+    </div>
+    <div class="home-grid">
+      <div class="hcard" onclick="showPanel('new')">
+        <div class="ico">👤</div>
+        <div class="ht">New profile</div>
+        <div class="hd">Create your personal tracker</div>
+      </div>
+      <div class="hcard" onclick="showPanel('login')">
+        <div class="ico">🔑</div>
+        <div class="ht">Log in</div>
+        <div class="hd">Continue with your name or ID</div>
+      </div>
+    </div>
+    <div class="panel hide" id="panel-new">
+      <h3>Create new profile</h3>
+      <div class="row-inp">
+        <input id="inp-new-name" placeholder="Enter your full name" maxlength="40">
+        <button class="btn btn-green" onclick="createProfile()">Create</button>
+      </div>
+      <div class="msg" id="msg-new"></div>
+    </div>
+    <div class="panel hide" id="panel-login">
+      <h3>Log in</h3>
+      <div class="row-inp">
+        <input id="inp-login" placeholder="Enter your name or ID (e.g. #0001)">
+        <button class="btn btn-green" onclick="doLogin()">Enter</button>
+      </div>
+      <div class="msg" id="msg-login"></div>
+      <div id="login-profiles" class="hide" style="margin-top:1rem">
+        <div class="profiles-label">Saved profiles</div>
+        <div id="login-profiles-list"></div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:.5rem">
+      <button class="btn" onclick="openDemo()">Try demo (no saving)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div id="pg-dash" class="hide">
+  <div class="topbar">
+    <div class="topbar-l">
+      <button class="back-btn" onclick="goHome()">← Home</button>
+      <div class="ubadge" id="dash-badge"></div>
+    </div>
+    <div class="topbar-r">
+      <div class="month-sel">
+        <select id="sel-month">
+          <option value="0">January</option><option value="1">February</option>
+          <option value="2">March</option><option value="3">April</option>
+          <option value="4">May</option><option value="5">June</option>
+          <option value="6">July</option><option value="7">August</option>
+          <option value="8">September</option><option value="9">October</option>
+          <option value="10">November</option><option value="11">December</option>
+        </select>
+        <input type="number" id="sel-year" value="2026" min="2020" max="2099">
+      </div>
+    </div>
+  </div>
+  <div class="tabs-bar">
+    <button class="tab active" id="tab-txn" onclick="switchTab('txn')">📋 Transactions</button>
+    <button class="tab" id="tab-summary" onclick="switchTab('summary')">📊 Monthly summary</button>
+    <button class="tab" id="tab-annual" onclick="switchTab('annual')">📈 Annual analysis</button>
+    <button class="tab" id="tab-rules" onclick="switchTab('rules')">⚙️ My rules</button>
+    <button class="tab" id="tab-upload" onclick="switchTab('upload')">📄 Upload statement</button>
+  </div>
+  <div class="page" id="pg-dash-body"></div>
+</div>
+
+<!-- ═══ DEMO ═══ -->
+<div id="pg-demo" class="hide">
+  <div class="topbar">
+    <div class="topbar-l">
+      <button class="back-btn" onclick="goHome()">← Home</button>
+      <div class="ubadge">Demo mode — <b>nothing saved</b></div>
+    </div>
+  </div>
+  <div class="page">
+    <div class="section">
+      <div class="sec-title">Welcome to Demo mode</div>
+      <p style="font-size:13px;color:#8b90a8;line-height:1.8">
+        This is a preview of the finance tracker.<br>
+        Create a profile to save your data, set keyword rules, and upload your bank statement.
+      </p>
+      <div style="margin-top:1rem;display:flex;gap:8px">
+        <button class="btn btn-green" onclick="goHome();setTimeout(()=>showPanel('new'),100)">Create profile</button>
+        <button class="btn" onclick="goHome()">Go home</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
