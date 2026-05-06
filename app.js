@@ -723,120 +723,175 @@ async function handlePDF(e) {
 function parseKotakPDF(items) {
   const rules = DB.rules[currentUser.id] || [];
 
-  // Step 1: sort top-to-bottom, left-to-right
+  // ── STEP 1: sort top-to-bottom then left-to-right
   items.sort((a,b) => a.y - b.y || a.x - b.x);
 
-  // Step 2: group into lines by Y proximity (within 5px = same line)
+  // ── STEP 2: group into lines by Y proximity (within 6px = same line)
   const lines = [];
   items.forEach(it => {
-    const line = lines.find(l => Math.abs(l.y - it.y) <= 5);
-    if (line) { line.items.push(it); }
-    else { lines.push({ y: it.y, items:[it] }); }
+    const line = lines.find(l => Math.abs(l.y - it.y) <= 6);
+    if (line) line.items.push(it);
+    else lines.push({ y: it.y, items:[it] });
   });
   lines.forEach(l => l.items.sort((a,b) => a.x - b.x));
 
-  // Step 3: detect column positions from header line
+  // ── STEP 3: detect column X positions from header line
+  // Look for line containing both "Date" and "Description"
+  let colX = { sr:40, date:90, desc:160, ref:370, wd:490, dep:590, bal:680 };
   const headerLine = lines.find(l =>
-    l.items.some(i => i.str === 'Date') &&
-    l.items.some(i => i.str.includes('Description'))
+    l.items.some(i => i.str.trim() === 'Date') &&
+    l.items.some(i => i.str.trim().includes('Description'))
   );
-
-  // default column X positions for Kotak (based on screenshot)
-  let colX = { sr:40, date:90, desc:160, ref:370, wd:480, dep:570, bal:650 };
   if (headerLine) {
     headerLine.items.forEach(it => {
       const s = it.str.trim();
-      if      (s === '#')                       colX.sr   = it.x;
-      else if (s === 'Date')                    colX.date = it.x;
-      else if (s.includes('Description'))       colX.desc = it.x;
-      else if (s.includes('Chq') || s.includes('Ref')) colX.ref = it.x;
-      else if (s.includes('Withdrawal') || s.includes('Dr')) colX.wd = it.x;
-      else if (s.includes('Deposit')    || s.includes('Cr')) colX.dep = it.x;
-      else if (s === 'Balance')                 colX.bal  = it.x;
+      if      (s === '#')                                    colX.sr   = it.x;
+      else if (s === 'Date')                                 colX.date = it.x;
+      else if (s.includes('Description'))                    colX.desc = it.x;
+      else if (s.includes('Chq') || s.includes('Ref'))      colX.ref  = it.x;
+      else if (s.includes('Withdrawal') || s.includes('Dr'))colX.wd   = it.x;
+      else if (s.includes('Deposit')    || s.includes('Cr'))colX.dep  = it.x;
+      else if (s === 'Balance')                              colX.bal  = it.x;
     });
   }
 
-  const inCol = (x, left, right) => x >= left - 20 && x < right + 20;
+  // ── STEP 4: define strict column ranges
+  // Each column ends where the next one starts — no overlap allowed
+  // This prevents balance bleeding into withdrawal
+  const colWdLeft   = colX.wd   - 10;
+  const colWdRight  = colX.dep  - 5;   // withdrawal MUST be left of deposit
+  const colDepLeft  = colX.dep  - 5;
+  const colDepRight = colX.bal  - 5;   // deposit MUST be left of balance
+  const colBalLeft  = colX.bal  - 5;
+
+  const inDesc = x => x >= colX.desc - 10 && x < colX.ref - 5;
+  const inRef  = x => x >= colX.ref  - 10 && x < colX.wd  - 5;
+  const inWd   = x => x >= colWdLeft  && x < colWdRight;
+  const inDep  = x => x >= colDepLeft && x < colDepRight;
+  const inBal  = x => x >= colBalLeft;
+
   const amtRe  = /^[\d,]+\.\d{2}$/;
   const dateRe = /^\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}$/i;
-  const srRe   = /^\d+$/;
-  const monthMap = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+  const srRe   = /^\d{1,3}$/;
+  const monthMap = {
+    jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+    jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'
+  };
 
+  const isAmt = str => amtRe.test(str.replace(/,/g,''));
+  const toAmt = str => parseFloat(str.replace(/,/g,''));
+
+  // ── STEP 5: reconstruct transactions line by line
   const transactions = [];
   let current = null;
 
   lines.forEach(line => {
-    // check if line has a date item in the date column
+    // find date item strictly in date column area
     const dateItem = line.items.find(it =>
-      dateRe.test(it.str.trim()) && Math.abs(it.x - colX.date) < 80
+      dateRe.test(it.str.trim()) &&
+      it.x >= colX.date - 30 && it.x <= colX.date + 80
     );
 
     if (dateItem) {
-      // save previous transaction
-      if (current && current.desc.length > 1) transactions.push(current);
+      // push previous transaction
+      if (current && current.desc.length > 1 && current.amount > 0) {
+        transactions.push(current);
+      }
 
-      // get withdrawal / deposit / balance amounts
-      const amtItems = line.items.filter(it => amtRe.test(it.str.replace(/,/g,'')));
-      const wdItem   = amtItems.find(it => inCol(it.x, colX.wd,  colX.dep));
-      const depItem  = amtItems.find(it => inCol(it.x, colX.dep, colX.bal));
+      // strictly get withdrawal amount (only from wd column)
+      const wdItem = line.items.find(it => isAmt(it.str) && inWd(it.x));
+      // strictly get deposit amount (only from dep column)
+      const depItem = line.items.find(it => isAmt(it.str) && inDep(it.x));
 
-      // description items in description column
+      // description: items in desc column, not amounts, not date, not sr no
       const descItems = line.items.filter(it =>
-        inCol(it.x, colX.desc, colX.ref) &&
-        !amtRe.test(it.str.replace(/,/g,'')) &&
-        !dateRe.test(it.str) &&
+        inDesc(it.x) &&
+        !isAmt(it.str) &&
+        !dateRe.test(it.str.trim()) &&
         !srRe.test(it.str.trim())
       );
 
-      // format date to YYYY-MM-DD
+      // format date YYYY-MM-DD
       const dp = dateItem.str.trim().split(/\s+/);
       const dateStr = dp.length === 3
         ? `${dp[2]}-${monthMap[dp[1].toLowerCase()]||'01'}-${dp[0].padStart(2,'0')}`
         : dateItem.str.trim();
 
-      const wd  = wdItem  ? parseFloat(wdItem.str.replace(/,/g,''))  : 0;
-      const dep = depItem ? parseFloat(depItem.str.replace(/,/g,'')) : 0;
+      const wd  = wdItem  ? toAmt(wdItem.str)  : 0;
+      const dep = depItem ? toAmt(depItem.str) : 0;
 
       current = {
-        date   : dateStr,
-        desc   : descItems.map(i=>i.str).join(' ').trim(),
-        wd, dep,
-        amount : wd > 0 ? wd : dep,
-        type   : wd > 0 ? 'Withdrawal' : 'Deposit'
+        date  : dateStr,
+        desc  : descItems.map(i => i.str).join(' ').trim(),
+        amount: wd > 0 ? wd : dep,
+        type  : wd > 0 ? 'Withdrawal' : 'Deposit'
       };
 
     } else if (current) {
-      // continuation line — append to description if items are in desc column
+      // ── continuation line (multi-line description)
+      // Only pick up items in description column area
+      // Skip: amounts, dates, "Value Date:" lines, "Page X of Y", footer lines
+      const lineText = line.items.map(i => i.str).join(' ').toLowerCase();
+      if (
+        lineText.includes('value date') ||
+        lineText.includes('page ') ||
+        lineText.includes('statement generated') ||
+        lineText.includes('opening balance')
+      ) return;
+
       const contItems = line.items.filter(it =>
-        inCol(it.x, colX.desc - 20, colX.ref + 20) &&
-        !amtRe.test(it.str.replace(/,/g,'')) &&
-        !dateRe.test(it.str) &&
-        !it.str.toLowerCase().includes('value date') &&
+        it.x >= colX.desc - 20 && it.x < colX.ref + 30 &&
+        !isAmt(it.str) &&
+        !dateRe.test(it.str.trim()) &&
         it.str.trim().length > 1
       );
+
       if (contItems.length) {
-        const extra = contItems.map(i=>i.str).join(' ').trim();
-        if (extra) current.desc += ' ' + extra;
+        const extra = contItems.map(i => i.str).join(' ').trim();
+        // Only append if it looks like a real description continuation
+        // (not a number-only string or single char)
+        if (extra && !/^\d+$/.test(extra)) {
+          current.desc += ' ' + extra;
+        }
       }
     }
   });
-  if (current && current.desc.length > 1) transactions.push(current);
 
-  // match keyword rules and remove duplicates
+  // push last transaction
+  if (current && current.desc.length > 1 && current.amount > 0) {
+    transactions.push(current);
+  }
+
+  // ── STEP 6: match keyword rules (fuzzy — ignores slashes, spaces, case)
+  function fuzzyMatch(desc, keyword) {
+    // normalize both: remove special chars, lowercase, collapse spaces
+    const norm = s => s.toUpperCase().replace(/[^A-Z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+    return norm(desc).includes(norm(keyword));
+  }
+
+  // ── STEP 7: remove duplicates and return
   const seen = new Set();
   return transactions
-    .filter(t => t.amount > 0)
+    .filter(t => t.amount > 0 && t.desc.length > 1)
     .map(t => {
+      // dedup key: date + amount + type
       const key = t.date + '|' + t.amount + '|' + t.type;
       if (seen.has(key)) return null;
       seen.add(key);
-      const descUp = t.desc.toUpperCase();
-      let cat='', subcat='';
+
+      // match rules with fuzzy matching
+      let cat = '', subcat = '';
       for (const r of rules) {
-        if (r.keyword && descUp.includes(r.keyword.toUpperCase())) {
+        if (r.keyword && fuzzyMatch(t.desc, r.keyword)) {
           cat = r.cat; subcat = r.subcat; break;
         }
       }
+
+      // smart fallback: if deposit and no rule matched, guess Income
+      if (!cat && t.type === 'Deposit') {
+        cat = 'Income'; subcat = 'Other Income';
+      }
+
       return { date:t.date, desc:t.desc.trim(), amount:t.amount, type:t.type, cat, subcat };
     })
     .filter(Boolean)
