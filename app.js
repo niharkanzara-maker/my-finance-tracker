@@ -80,9 +80,10 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 
 // ── HOME ───────────────────────────────────────
 function showPanel(t) {
-  $('panel-signup').classList.add('hide');
-  $('panel-login').classList.add('hide');
-  $('panel-' + t).classList.remove('hide');
+  ['signup','login'].forEach(p => {
+    const el = $('panel-' + p);
+    if (el) el.style.display = p === t ? 'block' : 'none';
+  });
 }
 
 async function signUp() {
