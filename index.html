@@ -19,48 +19,86 @@
       <h1>My Finance Tracker</h1>
       <p>Track income, expenses &amp; investments — powered by your bank statement</p>
     </div>
-    <div class="home-grid">
-      <div class="hcard" onclick="showPanel('signup')">
-        <div class="ico">👤</div>
-        <div class="ht">Create account</div>
-        <div class="hd">Sign up with email &amp; password</div>
+
+    <!-- DEFAULT VIEW — two cards -->
+    <div id="home-cards">
+      <div class="home-grid">
+        <div class="hcard" onclick="showPanel('signup')">
+          <div class="ico">👤</div>
+          <div class="ht">Create account</div>
+          <div class="hd">Sign up with email &amp; password</div>
+        </div>
+        <div class="hcard" onclick="showPanel('login')">
+          <div class="ico">🔑</div>
+          <div class="ht">Log in</div>
+          <div class="hd">Continue with your email</div>
+        </div>
       </div>
-      <div class="hcard" onclick="showPanel('login')">
-        <div class="ico">🔑</div>
-        <div class="ht">Log in</div>
-        <div class="hd">Continue with your email</div>
+      <div style="text-align:center;margin-top:.5rem">
+        <button class="btn" onclick="openDemo()">Try demo (no saving)</button>
       </div>
     </div>
 
-    <!-- SIGNUP PANEL -->
-    <div class="panel" id="panel-signup" style="display:none">
-      <h3>Create new account</h3>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="field"><label>Full name</label><input type="text" id="inp-signup-name" placeholder="Enter your full name"></div>
-        <div class="field"><label>Email address</label><input type="email" id="inp-signup-email" placeholder="Enter your email"></div>
-        <div class="field"><label>Password</label><input type="password" id="inp-signup-pass" placeholder="Min 6 characters"></div>
-        <div class="field"><label>Confirm password</label><input type="password" id="inp-signup-confirm" placeholder="Repeat your password"></div>
+    <!-- SIGNUP FORM -->
+    <div id="panel-signup" style="display:none">
+      <div class="panel">
+        <h3>Create new account</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="field">
+            <label>Full name</label>
+            <input type="text" id="inp-signup-name" placeholder="Enter your full name">
+          </div>
+          <div class="field">
+            <label>Email address</label>
+            <input type="email" id="inp-signup-email" placeholder="Enter your email">
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input type="password" id="inp-signup-pass" placeholder="Minimum 6 characters">
+          </div>
+          <div class="field">
+            <label>Confirm password</label>
+            <input type="password" id="inp-signup-confirm" placeholder="Repeat your password">
+          </div>
+        </div>
+        <button class="btn btn-green" style="width:100%;margin-top:1rem" onclick="signUp()">Create account</button>
+        <div class="msg" id="msg-signup"></div>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">
+          Already have an account?
+          <a href="#" onclick="showPanel('login');return false;" style="color:#378ADD">Log in</a>
+        </p>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.4rem;text-align:center">
+          <a href="#" onclick="showPanel('none');return false;" style="color:#8b90a8">← Back</a>
+        </p>
       </div>
-      <button class="btn btn-green" style="width:100%;margin-top:1rem" onclick="signUp()">Create account</button>
-      <div class="msg" id="msg-signup"></div>
-      <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">Already have an account? <a href="#" onclick="showPanel('login')" style="color:#378ADD">Log in</a></p>
     </div>
 
-    <!-- LOGIN PANEL -->
-    <div class="panel" id="panel-login" style="display:none">
-      <h3>Log in to your account</h3>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="field"><label>Email address</label><input type="email" id="inp-login-email" placeholder="Enter your email"></div>
-        <div class="field"><label>Password</label><input type="password" id="inp-login-pass" placeholder="Enter your password"></div>
+    <!-- LOGIN FORM -->
+    <div id="panel-login" style="display:none">
+      <div class="panel">
+        <h3>Log in to your account</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="field">
+            <label>Email address</label>
+            <input type="email" id="inp-login-email" placeholder="Enter your email">
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input type="password" id="inp-login-pass" placeholder="Enter your password">
+          </div>
+        </div>
+        <button class="btn btn-green" style="width:100%;margin-top:1rem" onclick="logIn()">Log in</button>
+        <div class="msg" id="msg-login"></div>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">
+          New here?
+          <a href="#" onclick="showPanel('signup');return false;" style="color:#378ADD">Create account</a>
+        </p>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.4rem;text-align:center">
+          <a href="#" onclick="showPanel('none');return false;" style="color:#8b90a8">← Back</a>
+        </p>
       </div>
-      <button class="btn btn-green" style="width:100%;margin-top:1rem" onclick="logIn()">Log in</button>
-      <div class="msg" id="msg-login"></div>
-      <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">New here? <a href="#" onclick="showPanel('signup')" style="color:#378ADD">Create account</a></p>
     </div>
 
-    <div style="text-align:center;margin-top:.5rem">
-      <button class="btn" onclick="openDemo()">Try demo (no saving)</button>
-    </div>
   </div>
 </div>
 
