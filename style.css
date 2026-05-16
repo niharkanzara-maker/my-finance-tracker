@@ -520,6 +520,10 @@ table.data-tbl input[type=date] {
   0%, 100% { transform: translateY(0); }
   50%       { transform: translateY(-8px); }
 }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
 .hero h1 {
   font-size: 28px;
   font-weight: 700;
