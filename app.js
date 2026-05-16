@@ -70,16 +70,6 @@ function showPanel(t) {
   }
 }
 
-// ── SUPABASE WITH TIMEOUT ──────────────────────
-async function sbQuery(queryFn, timeoutMs = 8000) {
-  return Promise.race([
-    queryFn(),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Connection timed out. Please refresh the page.')), timeoutMs)
-    )
-  ]);
-}
-
 // ── LOADING HELPER ─────────────────────────────
 function showLoading(message = 'Loading…') {
   const body = $('pg-dash-body');
@@ -87,19 +77,19 @@ function showLoading(message = 'Loading…') {
     <div style="text-align:center;padding:3rem 1rem">
       <div style="font-size:32px;margin-bottom:1rem;animation:spin 1s linear infinite;display:inline-block">⏳</div>
       <div style="font-size:14px;color:#8892b0;margin-bottom:.5rem">${message}</div>
-      <div style="font-size:12px;color:#4a5568">If this takes too long, please refresh the page.</div>
+      <div style="font-size:12px;color:#4a5568">Please wait…</div>
     </div>`;
 }
 
 // ── AUTH INIT ──────────────────────────────────
 window.onload = async function() {
   try {
-    const { data: { session } } = await sbQuery(() => sb.auth.getSession());
+    const { data: { session } } = await sb.auth.getSession();
     if (session) { currentUser = session.user; await loadProfile(); }
     else showPage('pg-home');
   } catch(e) {
-    showPage('pg-home');
     console.error('Session load failed:', e.message);
+    showPage('pg-home');
   }
 };
 
