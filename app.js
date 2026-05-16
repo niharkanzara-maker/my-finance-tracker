@@ -70,11 +70,37 @@ function showPanel(t) {
   }
 }
 
+// ── SUPABASE WITH TIMEOUT ──────────────────────
+async function sbQuery(queryFn, timeoutMs = 8000) {
+  return Promise.race([
+    queryFn(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timed out. Please refresh the page.')), timeoutMs)
+    )
+  ]);
+}
+
+// ── LOADING HELPER ─────────────────────────────
+function showLoading(message = 'Loading…') {
+  const body = $('pg-dash-body');
+  if (body) body.innerHTML = `
+    <div style="text-align:center;padding:3rem 1rem">
+      <div style="font-size:32px;margin-bottom:1rem;animation:spin 1s linear infinite;display:inline-block">⏳</div>
+      <div style="font-size:14px;color:#8892b0;margin-bottom:.5rem">${message}</div>
+      <div style="font-size:12px;color:#4a5568">If this takes too long, please refresh the page.</div>
+    </div>`;
+}
+
 // ── AUTH INIT ──────────────────────────────────
 window.onload = async function() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) { currentUser = session.user; await loadProfile(); }
-  else showPage('pg-home');
+  try {
+    const { data: { session } } = await sbQuery(() => sb.auth.getSession());
+    if (session) { currentUser = session.user; await loadProfile(); }
+    else showPage('pg-home');
+  } catch(e) {
+    showPage('pg-home');
+    console.error('Session load failed:', e.message);
+  }
 };
 
 sb.auth.onAuthStateChange(async (event, session) => {
@@ -119,27 +145,44 @@ async function logIn() {
   const msgEl    = $('msg-login');
   if (!email || !password) { setMsg(msgEl,'err','Please enter email and password.'); return; }
   setMsg(msgEl,'info','Logging in…');
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) { setMsg(msgEl,'err', error.message); return; }
-  setMsg(msgEl,'ok','Welcome back! Loading your dashboard…');
+  try {
+    const { error } = await sbQuery(() => sb.auth.signInWithPassword({ email, password }));
+    if (error) { setMsg(msgEl,'err', error.message); return; }
+    setMsg(msgEl,'ok','Welcome back! Loading your dashboard…');
+  } catch(e) {
+    setMsg(msgEl,'err', e.message);
+  }
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-  if (error || !data) {
-    const name = localStorage.getItem('pendingName') || currentUser.email.split('@')[0];
-    localStorage.removeItem('pendingName');
-    const uniqueId = await generateUniqueId();
-    const { error: profErr } = await sb.from('profiles').insert({
-      id: currentUser.id, name, unique_id: uniqueId, bank: 'kotak'
-    });
-    if (profErr) { await sb.auth.signOut(); showPage('pg-home'); return; }
-    const { data: newProfile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-    currentProfile = newProfile;
-  } else {
-    currentProfile = data;
+  try {
+    const { data, error } = await sbQuery(() =>
+      sb.from('profiles').select('*').eq('id', currentUser.id).single()
+    );
+    if (error || !data) {
+      const name = localStorage.getItem('pendingName') || currentUser.email.split('@')[0];
+      localStorage.removeItem('pendingName');
+      const uniqueId = await generateUniqueId();
+      const { error: profErr } = await sbQuery(() =>
+        sb.from('profiles').insert({
+          id: currentUser.id, name, unique_id: uniqueId, bank: 'kotak'
+        })
+      );
+      if (profErr) { await sb.auth.signOut(); showPage('pg-home'); return; }
+      const { data: newProfile } = await sbQuery(() =>
+        sb.from('profiles').select('*').eq('id', currentUser.id).single()
+      );
+      currentProfile = newProfile;
+    } else {
+      currentProfile = data;
+    }
+    enterDash();
+  } catch(e) {
+    console.error('Profile load failed:', e.message);
+    await sb.auth.signOut();
+    showPage('pg-home');
+    alert('Could not load your profile. Please try logging in again.');
   }
-  enterDash();
 }
 
 function enterDash() {
@@ -262,8 +305,19 @@ function calcNetWorthFromData(openingBals, allTxns) {
 async function renderTxn() {
   const body = $('pg-dash-body');
   const {m,y} = getMonthYear();
-  body.innerHTML = `<div style="text-align:center;padding:2rem;color:#8892b0">Loading transactions…</div>`;
-  const txns = await getTxns();
+  showLoading('Loading transactions…');
+  let txns = [];
+  try {
+    const { data } = await sbQuery(() =>
+      sb.from('transactions').select('*')
+        .eq('user_id', currentUser.id).eq('month',m).eq('year',y)
+        .order('date',{ascending:true})
+    );
+    txns = data || [];
+  } catch(e) {
+    body.innerHTML = `<div class="section"><div class="empty"><div class="empty-icon">⚠️</div>${e.message}</div></div>`;
+    return;
+  }
   body.innerHTML = `
   <div class="section">
     <div class="sec-title">
