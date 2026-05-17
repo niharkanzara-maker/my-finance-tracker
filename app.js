@@ -1,4 +1,4 @@
-  // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
 //  MY FINANCE TRACKER — app.js
 //  With Net Worth, Carry Forward, Fixed Logic
 // ═══════════════════════════════════════════════
@@ -136,32 +136,26 @@ async function logIn() {
   if (!email || !password) { setMsg(msgEl,'err','Please enter email and password.'); return; }
   setMsg(msgEl,'info','Logging in…');
   try {
-    const { error } = await sbQuery(() => sb.auth.signInWithPassword({ email, password }));
+    const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) { setMsg(msgEl,'err', error.message); return; }
     setMsg(msgEl,'ok','Welcome back! Loading your dashboard…');
   } catch(e) {
-    setMsg(msgEl,'err', e.message);
+    setMsg(msgEl,'err','Connection failed. Please refresh and try again.');
   }
 }
 
 async function loadProfile() {
   try {
-    const { data, error } = await sbQuery(() =>
-      sb.from('profiles').select('*').eq('id', currentUser.id).single()
-    );
+    const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
     if (error || !data) {
       const name = localStorage.getItem('pendingName') || currentUser.email.split('@')[0];
       localStorage.removeItem('pendingName');
       const uniqueId = await generateUniqueId();
-      const { error: profErr } = await sbQuery(() =>
-        sb.from('profiles').insert({
-          id: currentUser.id, name, unique_id: uniqueId, bank: 'kotak'
-        })
-      );
+      const { error: profErr } = await sb.from('profiles').insert({
+        id: currentUser.id, name, unique_id: uniqueId, bank: 'kotak'
+      });
       if (profErr) { await sb.auth.signOut(); showPage('pg-home'); return; }
-      const { data: newProfile } = await sbQuery(() =>
-        sb.from('profiles').select('*').eq('id', currentUser.id).single()
-      );
+      const { data: newProfile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
       currentProfile = newProfile;
     } else {
       currentProfile = data;
@@ -298,14 +292,12 @@ async function renderTxn() {
   showLoading('Loading transactions…');
   let txns = [];
   try {
-    const { data } = await sbQuery(() =>
-      sb.from('transactions').select('*')
-        .eq('user_id', currentUser.id).eq('month',m).eq('year',y)
-        .order('date',{ascending:true})
-    );
+    const { data } = await sb.from('transactions').select('*')
+      .eq('user_id', currentUser.id).eq('month',m).eq('year',y)
+      .order('date',{ascending:true});
     txns = data || [];
   } catch(e) {
-    body.innerHTML = `<div class="section"><div class="empty"><div class="empty-icon">⚠️</div>${e.message}</div></div>`;
+    body.innerHTML = `<div class="section"><div class="empty"><div class="empty-icon">⚠️</div>Failed to load. Please refresh.</div></div>`;
     return;
   }
   body.innerHTML = `
