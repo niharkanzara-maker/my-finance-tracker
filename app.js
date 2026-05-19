@@ -674,29 +674,117 @@ function renderUpload(){
   $('pg-dash-body').innerHTML=`
   <div class="section">
     <div class="sec-title">Upload bank statement</div>
-    <p style="font-size:12px;color:#8892b0;margin-bottom:1rem;line-height:1.7">Upload your Kotak Mahindra bank statement PDF.</p>
-    <div class="upload-zone" onclick="$('pdf-input').click()">
-      <div class="u-ico">📄</div>
-      <p>Click to select your <b>bank statement PDF</b></p>
-      <p style="font-size:11px;margin-top:.3rem">System-generated PDF only</p>
+    <p style="font-size:12px;color:#8892b0;margin-bottom:1.25rem;line-height:1.7">
+      Upload your bank statement in any format — PDF, CSV or Excel.
+      Transactions will be matched against your keyword rules.
+    </p>
+
+    <!-- FORMAT TABS -->
+    <div style="display:flex;gap:8px;margin-bottom:1.25rem">
+      <button class="btn active" id="fmt-pdf" style="border-color:#4d9fff;color:#4d9fff" onclick="setUploadFormat('pdf')">📄 PDF</button>
+      <button class="btn" id="fmt-csv" onclick="setUploadFormat('csv')">📊 CSV</button>
+      <button class="btn" id="fmt-excel" onclick="setUploadFormat('excel')">📗 Excel (.xlsx)</button>
     </div>
-    <input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="handlePDF(event)">
+
+    <!-- PDF UPLOAD -->
+    <div id="upload-pdf">
+      <div class="info-box">
+        <b>How to get PDF:</b> Open your bank app or net banking → Statements → Download PDF statement
+      </div>
+      <div class="upload-zone" id="pdf-zone">
+        <div class="u-ico">📄</div>
+        <p>Click to select your <b>bank statement PDF</b></p>
+        <p style="font-size:11px;margin-top:.3rem">System-generated PDF only (not scanned)</p>
+      </div>
+      <input type="file" id="pdf-input" accept=".pdf" style="display:none">
+    </div>
+
+    <!-- CSV UPLOAD -->
+    <div id="upload-csv" style="display:none">
+      <div class="info-box">
+        <b>How to get CSV:</b> Open Kotak net banking on PC → Accounts → Account Statement → Download as CSV
+      </div>
+      <div class="upload-zone" id="csv-zone">
+        <div class="u-ico">📊</div>
+        <p>Click to select your <b>bank statement CSV</b></p>
+        <p style="font-size:11px;margin-top:.3rem">Comma separated values file (.csv)</p>
+      </div>
+      <input type="file" id="csv-input" accept=".csv" style="display:none">
+    </div>
+
+    <!-- EXCEL UPLOAD -->
+    <div id="upload-excel" style="display:none">
+      <div class="info-box">
+        <b>How to get Excel:</b> Open Kotak net banking on PC → Accounts → Account Statement → Download as Excel
+      </div>
+      <div class="upload-zone" id="excel-zone">
+        <div class="u-ico">📗</div>
+        <p>Click to select your <b>bank statement Excel file</b></p>
+        <p style="font-size:11px;margin-top:.3rem">Excel file (.xlsx or .xls)</p>
+      </div>
+      <input type="file" id="excel-input" accept=".xlsx,.xls" style="display:none">
+    </div>
+
     <div class="msg" id="upload-msg" style="margin-top:.75rem;font-size:13px"></div>
   </div>
+
+  <!-- CONFIRM SECTION -->
   <div id="confirm-section" style="display:none">
     <div class="section">
-      <div class="sec-title"><span>Review transactions</span><span id="txn-count" style="font-size:12px;color:#8892b0;font-weight:400"></span></div>
-      <p style="font-size:12px;color:#8892b0;margin-bottom:.85rem"><span style="color:#ff6b6b">■</span> Orange rows = unmatched — please select a category.</p>
-      <div class="tbl-wrap"><table class="data-tbl">
-        <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Category</th><th>Sub-category</th></tr></thead>
-        <tbody id="txn-confirm-body"></tbody>
-      </table></div>
+      <div class="sec-title">
+        <span>Review transactions</span>
+        <span id="txn-count" style="font-size:12px;color:#8892b0;font-weight:400"></span>
+      </div>
+      <p style="font-size:12px;color:#8892b0;margin-bottom:.85rem">
+        <span style="color:#ff6b6b">■</span> Orange rows = unmatched — please select a category.
+      </p>
+      <div class="tbl-wrap">
+        <table class="data-tbl">
+          <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Category</th><th>Sub-category</th></tr></thead>
+          <tbody id="txn-confirm-body"></tbody>
+        </table>
+      </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:1rem">
         <button class="btn" onclick="switchTab('upload')">Cancel</button>
         <button class="btn btn-green" onclick="confirmImport()">Confirm &amp; import transactions</button>
       </div>
     </div>
   </div>`;
+
+  // attach click handlers after DOM is ready
+  setupUploadHandlers();
+}
+
+function setupUploadHandlers(){
+  // PDF
+  const pdfZone = $('pdf-zone'), pdfInput = $('pdf-input');
+  if(pdfZone && pdfInput){
+    pdfZone.onclick = () => pdfInput.click();
+    pdfInput.onchange = (e) => handlePDF(e);
+  }
+  // CSV
+  const csvZone = $('csv-zone'), csvInput = $('csv-input');
+  if(csvZone && csvInput){
+    csvZone.onclick = () => csvInput.click();
+    csvInput.onchange = (e) => handleCSV(e);
+  }
+  // Excel
+  const excelZone = $('excel-zone'), excelInput = $('excel-input');
+  if(excelZone && excelInput){
+    excelZone.onclick = () => excelInput.click();
+    excelInput.onchange = (e) => handleExcel(e);
+  }
+}
+
+window.setUploadFormat = function(fmt){
+  ['pdf','csv','excel'].forEach(f=>{
+    $('upload-'+f).style.display = f===fmt?'block':'none';
+    const btn = $('fmt-'+f);
+    if(btn){
+      btn.style.borderColor = f===fmt?'#4d9fff':'';
+      btn.style.color       = f===fmt?'#4d9fff':'';
+    }
+  });
 }
 
 window.handlePDF=async function(e){
