@@ -759,20 +759,20 @@ function setupUploadHandlers(){
   // PDF
   const pdfZone = $('pdf-zone'), pdfInput = $('pdf-input');
   if(pdfZone && pdfInput){
-    pdfZone.onclick = () => pdfInput.click();
-    pdfInput.onchange = (e) => handlePDF(e);
+    pdfZone.addEventListener('click', () => pdfInput.click());
+    pdfInput.addEventListener('change', (e) => handlePDF(e));
   }
   // CSV
   const csvZone = $('csv-zone'), csvInput = $('csv-input');
   if(csvZone && csvInput){
-    csvZone.onclick = () => csvInput.click();
-    csvInput.onchange = (e) => handleCSV(e);
+    csvZone.addEventListener('click', () => csvInput.click());
+    csvInput.addEventListener('change', (e) => handleCSV(e));
   }
   // Excel
   const excelZone = $('excel-zone'), excelInput = $('excel-input');
   if(excelZone && excelInput){
-    excelZone.onclick = () => excelInput.click();
-    excelInput.onchange = (e) => handleExcel(e);
+    excelZone.addEventListener('click', () => excelInput.click());
+    excelInput.addEventListener('change', (e) => handleExcel(e));
   }
 }
 
