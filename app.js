@@ -3,10 +3,7 @@
 //  Firebase Auth + Supabase Database
 // ═══════════════════════════════════════════════
 
-// ── FIREBASE AUTH ──────────────────────────────
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-
+// ── FIREBASE AUTH (compat SDK - no imports needed) ──
 const firebaseConfig = {
   apiKey: "AIzaSyBUSr0WH95KcDURGvEhlTkm8VntwDzOYfI",
   authDomain: "my-finance-tracker-6a51a.firebaseapp.com",
@@ -15,9 +12,8 @@ const firebaseConfig = {
   messagingSenderId: "190800540862",
   appId: "1:190800540862:web:a83425381020bb66fbdaef"
 };
-
-const firebaseApp = initializeApp(firebaseConfig);
-const auth = getAuth(firebaseApp);
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 
 // ── SUPABASE DATABASE ──────────────────────────
 const SUPABASE_URL = 'https://ktbugezdzcrpuzrfnsbq.supabase.co';
@@ -91,8 +87,8 @@ window.showPanel = function(t) {
 }
 
 // ── AUTH STATE LISTENER ────────────────────────
-// Firebase instantly knows if user is logged in — no delay!
-onAuthStateChanged(auth, async (user) => {
+// Firebase compat SDK uses auth.onAuthStateChanged directly
+auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentUser = { id: user.uid, email: user.email };
     await loadProfile();
@@ -117,7 +113,7 @@ window.signUp = async function() {
   setMsg(msgEl,'info','Creating your account…');
   try {
     localStorage.setItem('pendingName', name);
-    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    await auth.createUserWithEmailAndPassword(email, password);
     // profile will be created in onAuthStateChanged → loadProfile
     setMsg(msgEl,'ok','Account created! Loading your dashboard…');
   } catch(e) {
@@ -138,7 +134,7 @@ window.logIn = async function() {
   if (!email||!password) { setMsg(msgEl,'err','Please enter email and password.'); return; }
   setMsg(msgEl,'info','Logging in…');
   try {
-    await signInWithEmailAndPassword(auth, email, password);
+    await auth.signInWithEmailAndPassword(email, password);
     setMsg(msgEl,'ok','Welcome back! Loading your dashboard…');
   } catch(e) {
     let msg = e.message;
@@ -164,7 +160,7 @@ async function loadProfile() {
       });
       if (profErr) {
         console.error('Profile create failed:', profErr.message);
-        await signOut(auth);
+        await auth.signOut();
         showPage('pg-home');
         return;
       }
@@ -176,8 +172,7 @@ async function loadProfile() {
     enterDash();
   } catch(e) {
     console.error('Profile load error:', e.message);
-    await signOut(auth);
-    showPage('pg-home');
+    await auth.signOut(); showPage('pg-home');
   }
 }
 
