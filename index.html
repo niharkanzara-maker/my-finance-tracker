@@ -9,14 +9,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<!-- Firebase via CDN (no import needed) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="app.js"></script>
 </head>
 <body>
 
-<!-- ═══ HOME PAGE ═══ -->
+<!-- HOME PAGE -->
 <div id="pg-home">
   <div class="page">
     <div class="hero">
@@ -24,8 +22,6 @@
       <h1>My Finance Tracker</h1>
       <p>Track income, expenses &amp; investments — powered by your bank statement</p>
     </div>
-
-    <!-- DEFAULT VIEW — two cards -->
     <div id="home-cards">
       <div class="home-grid">
         <div class="hcard" onclick="showPanel('signup')">
@@ -43,75 +39,42 @@
         <button class="btn" onclick="openDemo()">Try demo (no saving)</button>
       </div>
     </div>
-
-    <!-- SIGNUP FORM -->
     <div id="panel-signup" style="display:none">
       <div class="panel">
         <h3>Create new account</h3>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <div class="field">
-            <label>Full name</label>
-            <input type="text" id="inp-signup-name" placeholder="Enter your full name">
-          </div>
-          <div class="field">
-            <label>Email address</label>
-            <input type="email" id="inp-signup-email" placeholder="Enter your email">
-          </div>
-          <div class="field">
-            <label>Password</label>
-            <input type="password" id="inp-signup-pass" placeholder="Minimum 6 characters">
-          </div>
-          <div class="field">
-            <label>Confirm password</label>
-            <input type="password" id="inp-signup-confirm" placeholder="Repeat your password">
-          </div>
+          <div class="field"><label>Full name</label><input type="text" id="inp-signup-name" placeholder="Enter your full name"></div>
+          <div class="field"><label>Email address</label><input type="email" id="inp-signup-email" placeholder="Enter your email"></div>
+          <div class="field"><label>Password</label><input type="password" id="inp-signup-pass" placeholder="Minimum 6 characters"></div>
+          <div class="field"><label>Confirm password</label><input type="password" id="inp-signup-confirm" placeholder="Repeat your password"></div>
         </div>
         <button class="btn btn-green" style="width:100%;margin-top:1rem" onclick="signUp()">Create account</button>
         <div class="msg" id="msg-signup"></div>
-        <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">
-          Already have an account?
-          <a href="#" onclick="showPanel('login');return false;" style="color:#378ADD">Log in</a>
-        </p>
-        <p style="font-size:12px;color:#8b90a8;margin-top:.4rem;text-align:center">
-          <a href="#" onclick="showPanel('none');return false;" style="color:#8b90a8">← Back</a>
-        </p>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">Already have an account? <a href="#" onclick="showPanel('login');return false;" style="color:#378ADD">Log in</a></p>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.4rem;text-align:center"><a href="#" onclick="showPanel('none');return false;" style="color:#8b90a8">← Back</a></p>
       </div>
     </div>
-
-    <!-- LOGIN FORM -->
     <div id="panel-login" style="display:none">
       <div class="panel">
         <h3>Log in to your account</h3>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <div class="field">
-            <label>Email address</label>
-            <input type="email" id="inp-login-email" placeholder="Enter your email">
-          </div>
-          <div class="field">
-            <label>Password</label>
-            <input type="password" id="inp-login-pass" placeholder="Enter your password">
-          </div>
+          <div class="field"><label>Email address</label><input type="email" id="inp-login-email" placeholder="Enter your email"></div>
+          <div class="field"><label>Password</label><input type="password" id="inp-login-pass" placeholder="Enter your password"></div>
         </div>
         <button class="btn btn-green" style="width:100%;margin-top:1rem" onclick="logIn()">Log in</button>
         <div class="msg" id="msg-login"></div>
-        <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">
-          New here?
-          <a href="#" onclick="showPanel('signup');return false;" style="color:#378ADD">Create account</a>
-        </p>
-        <p style="font-size:12px;color:#8b90a8;margin-top:.4rem;text-align:center">
-          <a href="#" onclick="showPanel('none');return false;" style="color:#8b90a8">← Back</a>
-        </p>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.75rem;text-align:center">New here? <a href="#" onclick="showPanel('signup');return false;" style="color:#378ADD">Create account</a></p>
+        <p style="font-size:12px;color:#8b90a8;margin-top:.4rem;text-align:center"><a href="#" onclick="showPanel('none');return false;" style="color:#8b90a8">← Back</a></p>
       </div>
     </div>
-
   </div>
 </div>
 
-<!-- ═══ DASHBOARD ═══ -->
+<!-- DASHBOARD -->
 <div id="pg-dash" class="hide">
   <div class="topbar">
     <div class="topbar-l">
-      <button class="back-btn" onclick="goHome()">← Home</button>
+      <button class="back-btn" onclick="logOut()">← Home</button>
       <div class="ubadge" id="dash-badge"></div>
     </div>
     <div class="topbar-r">
@@ -124,44 +87,43 @@
           <option value="8">September</option><option value="9">October</option>
           <option value="10">November</option><option value="11">December</option>
         </select>
-        <input type="number" id="sel-year" value="2026" min="2020" max="2099">
+        <input type="number" id="sel-year" value="2026" min="2020" max="2099" style="width:74px">
       </div>
       <button class="btn btn-red btn-sm" onclick="logOut()">Log out</button>
     </div>
   </div>
   <div class="tabs-bar">
-    <button class="tab active" id="tab-txn" onclick="switchTab('txn')">📋 Transactions</button>
-    <button class="tab" id="tab-summary" onclick="switchTab('summary')">📊 Monthly summary</button>
-    <button class="tab" id="tab-annual" onclick="switchTab('annual')">📈 Annual analysis</button>
-    <button class="tab" id="tab-rules" onclick="switchTab('rules')">⚙️ My rules</button>
-    <button class="tab" id="tab-upload" onclick="switchTab('upload')">📄 Upload statement</button>
+    <button class="tab active" id="tab-txn"      onclick="switchTab('txn')">📋 Transactions</button>
+    <button class="tab"        id="tab-summary"  onclick="switchTab('summary')">📊 Monthly summary</button>
+    <button class="tab"        id="tab-networth" onclick="switchTab('networth')">💎 Net worth</button>
+    <button class="tab"        id="tab-annual"   onclick="switchTab('annual')">📈 Annual analysis</button>
+    <button class="tab"        id="tab-rules"    onclick="switchTab('rules')">⚙️ My rules</button>
+    <button class="tab"        id="tab-upload"   onclick="switchTab('upload')">📄 Upload statement</button>
   </div>
   <div class="page" id="pg-dash-body"></div>
 </div>
 
-<!-- ═══ DEMO ═══ -->
+<!-- DEMO -->
 <div id="pg-demo" class="hide">
   <div class="topbar">
     <div class="topbar-l">
-      <button class="back-btn" onclick="goHome()">← Home</button>
+      <button class="back-btn" onclick="logOut()">← Home</button>
       <div class="ubadge">Demo mode — <b>nothing saved</b></div>
     </div>
   </div>
   <div class="page">
     <div class="section">
       <div class="sec-title">Welcome to Demo mode</div>
-      <p style="font-size:13px;color:#8b90a8;line-height:1.8">
-        This is a preview of the finance tracker.<br>
-        Create a profile to save your data, set keyword rules, and upload your bank statement.
-      </p>
+      <p style="font-size:13px;color:#8b90a8;line-height:1.8">Create a profile to save your data, set keyword rules, and upload your bank statement.</p>
       <div style="margin-top:1rem;display:flex;gap:8px">
-        <button class="btn btn-green" onclick="goHome();setTimeout(()=>showPanel('new'),100)">Create profile</button>
-        <button class="btn" onclick="goHome()">Go home</button>
+        <button class="btn btn-green" onclick="logOut();setTimeout(()=>showPanel('signup'),100)">Create account</button>
+        <button class="btn" onclick="logOut()">Go home</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- app.js loaded last so all libraries are ready -->
 <script src="app.js"></script>
 </body>
 </html>
