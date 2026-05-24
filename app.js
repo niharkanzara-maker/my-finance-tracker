@@ -329,7 +329,8 @@ async function renderSummary() {
   });
   var netAst=assetsIn-assetsOut,netLib=liabIn-liabOut;
   var surplus=Math.max(0,income-expenses-netAst);
-  var savRate=income>0?Math.round((income-expenses)/income*100):0;
+  // Fix 1: savings rate never negative
+  var savRate=income>0?Math.round(Math.max(0,income-expenses)/income*100):0;
   var expArr=Object.entries(expSubs).sort(function(a,b){return b[1]-a[1];});
   var incArr=Object.entries(incSubs).sort(function(a,b){return b[1]-a[1];});
   var astArr=Object.entries(astSubs).sort(function(a,b){return b[1]-a[1];});
@@ -471,7 +472,7 @@ async function renderAnnual() {
       if(t.category==='Expenses')exp+=amt;
       if(t.category==='Assets'&&t.type==='Withdrawal')ast+=amt;
     });
-    entries.push({m:m,inc:inc,exp:exp,ast:ast,sav:inc-exp,cnt:txns.length});
+    entries.push({m:m,inc:inc,exp:exp,ast:ast,sav:Math.max(0,inc-exp),cnt:txns.length});
   }
   var sI=entries.reduce(function(a,e){return a+e.inc;},0);
   var sE=entries.reduce(function(a,e){return a+e.exp;},0);
@@ -635,16 +636,33 @@ async function handlePDF(e){
 }
 
 // ── CSV HANDLER ──
-async function handleCSV(e){
-  var file=e.target.files[0];if(!file)return;
-  var msgEl=$('upload-msg');setMsg(msgEl,'info','📊 Reading CSV…');
-  try{
-    var text=await file.text();
-    var rules=await getRules(),txns=parseCSV(text,rules);
-    if(!txns.length){setMsg(msgEl,'err','No transactions found in CSV.');return;}
+async function handleCSV(e) {
+  var file=e.target.files[0]; if(!file)return;
+  var msgEl=$('upload-msg'); setMsg(msgEl,'info','📊 Reading CSV…');
+  try {
+    var text  = await file.text();
+    var rules = await getRules();
+    var result = parseCSV(text, rules);
+    var txns   = result.txns;
+    var closingBal = result.closingBalance;
+    if (!txns.length) { setMsg(msgEl,'err','No transactions found in CSV.'); return; }
     setMsg(msgEl,'ok','✅ '+txns.length+' transactions found. Review below.');
-    pendingTxns=txns;showConfirm(txns);
-  }catch(err){setMsg(msgEl,'err','Error: '+err.message);}
+    pendingTxns = txns;
+
+    // Fix 4: Show bank balance confirmation if closing balance found
+    if (closingBal > 0) {
+      var d = getMonthYear();
+      var balHtml = '<div style="background:#0c2a1a;border:1px solid #1D9E75;border-radius:8px;padding:.85rem 1rem;margin-top:.75rem;font-size:13px;color:#e8eaf0">'
+        +'<b style="color:#00d4a0">Bank balance detected: '+fmt(closingBal)+'</b><br>'
+        +'<span style="font-size:12px;color:#8892b0">This is your closing balance for '+MFULL[d.m]+' '+d.y+'. Would you like to save it as a bank asset?</span><br>'
+        +'<div style="display:flex;gap:8px;margin-top:.6rem">'
+        +'<button class="btn btn-green btn-sm" onclick="saveBankBalance('+closingBal+')">Yes, save bank balance</button>'
+        +'<button class="btn btn-sm" onclick="this.parentElement.parentElement.remove()">Skip</button>'
+        +'</div></div>';
+      $('upload-msg').insertAdjacentHTML('afterend', balHtml);
+    }
+    showConfirm(txns);
+  } catch(err) { setMsg(msgEl,'err','Error: '+err.message); }
 }
 
 // ── EXCEL HANDLER ──
@@ -662,48 +680,87 @@ async function handleExcel(e){
   }catch(err){setMsg(msgEl,'err','Error: '+err.message);}
 }
 
-// ── KOTAK CSV PARSER ──
-function parseCSV(text,rules){
-  var lines=text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
-  var hIdx=-1;
-  for(var i=0;i<lines.length;i++){
-    var cols=splitCSV(lines[i]);
-    if(cols[0]&&cols[0].toLowerCase().replace(/[^a-z]/g,'').includes('sl')){hIdx=i;break;}
-  }
-  if(hIdx===-1)return[];
+// ── SMART KEYWORD MATCHING ──
+// Fix 6: Better fuzzy matching with spaces
+function fuzzyMatch(desc, kw) {
+  // normalize: uppercase, replace special chars with space, collapse spaces
+  var n = function(s) {
+    return s.toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  return n(desc).includes(n(kw));
+}
 
-  function parseDate(d){
-    d=d.trim().split(' ')[0];
-    var m=/^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(d);
-    if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-    m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(d);
-    if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+// Fix 3: Smart category application based on transaction type
+function applyRule(rule, type) {
+  var cat = rule.category, sub = rule.subcategory;
+  // Income rules only apply to Deposits
+  if (cat === 'Income' && type !== 'Deposit')     return null;
+  // Expense rules only apply to Withdrawals
+  if (cat === 'Expenses' && type !== 'Withdrawal') return null;
+  // Assets and Liabilities apply to both types
+  return { cat: cat, subcat: sub };
+}
+
+// ── KOTAK CSV PARSER ──
+function parseCSV(text, rules) {
+  var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
+  var hIdx = -1;
+  var lastBalance = 0; // Fix 4: track closing balance
+  for (var i=0; i<lines.length; i++) {
+    var cols = splitCSV(lines[i]);
+    if (cols[0] && cols[0].toLowerCase().replace(/[^a-z]/g,'').includes('sl')) { hIdx=i; break; }
+  }
+  if (hIdx===-1) return { txns:[], closingBalance:0 };
+
+  function parseDate(d) {
+    d = d.trim().split(' ')[0];
+    var m = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(d);
+    if (m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(d);
+    if (m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
     return d;
   }
-  function cleanAmt(s){return parseFloat((s||'').replace(/[,₹"\s]/g,''))||0;}
-  function fuzzy(desc,kw){
-    var n=function(s){return s.toUpperCase().replace(/[^A-Z0-9\s]/g,' ').replace(/\s+/g,' ').trim();};
-    return n(desc).includes(n(kw));
+  function cleanAmt(s) { return parseFloat((s||'').replace(/[,₹"\s]/g,''))||0; }
+
+  var txns = [], seen = new Set();
+  for (var i=hIdx+1; i<lines.length; i++) {
+    var cols = splitCSV(lines[i]);
+    if (!cols[0] || isNaN(parseInt(cols[0]))) continue;
+    var date  = parseDate(cols[1]||'');
+    var desc  = (cols[3]||'').trim();
+    var amt   = cleanAmt(cols[5]);
+    var drcr  = (cols[6]||'').trim().toUpperCase();
+    var bal   = cleanAmt(cols[7]||'0'); // Fix 4: read balance column
+
+    if (!date||!desc||!amt) continue;
+    var type = drcr==='CR' ? 'Deposit' : 'Withdrawal';
+    var key  = date+'|'+amt+'|'+type+'|'+desc.slice(0,10);
+    if (seen.has(key)) continue; seen.add(key);
+
+    // Fix 3 & 5 & 6: smart keyword matching with type awareness
+    var cat='', subcat='';
+    for (var j=0; j<rules.length; j++) {
+      if (rules[j].keyword && fuzzyMatch(desc, rules[j].keyword)) {
+        var applied = applyRule(rules[j], type);
+        if (applied) { cat=applied.cat; subcat=applied.subcat; break; }
+      }
+    }
+    // Fix 2 & 5: NO default category — leave blank if no keyword matched
+    // User must manually select in review screen
+
+    // Fix 4: track last balance
+    if (bal > 0) lastBalance = bal;
+
+    txns.push({ date:date, desc:desc, amount:amt, type:type, cat:cat, subcat:subcat });
   }
 
-  var txns=[],seen=new Set();
-  for(var i=hIdx+1;i<lines.length;i++){
-    var cols=splitCSV(lines[i]);
-    if(!cols[0]||isNaN(parseInt(cols[0])))continue;
-    var date=parseDate(cols[1]||'');
-    var desc=(cols[3]||'').trim();
-    var amt=cleanAmt(cols[5]);
-    var drcr=(cols[6]||'').trim().toUpperCase();
-    if(!date||!desc||!amt)continue;
-    var type=drcr==='CR'?'Deposit':'Withdrawal';
-    var key=date+'|'+amt+'|'+type+'|'+desc.slice(0,10);
-    if(seen.has(key))continue;seen.add(key);
-    var cat='',subcat='';
-    for(var j=0;j<rules.length;j++){if(rules[j].keyword&&fuzzy(desc,rules[j].keyword)){cat=rules[j].category;subcat=rules[j].subcategory;break;}}
-    if(!cat&&type==='Deposit'){cat='Income';subcat='Other Income';}
-    txns.push({date:date,desc:desc,amount:amt,type:type,cat:cat,subcat:subcat});
-  }
-  return txns.sort(function(a,b){return a.date.localeCompare(b.date);});
+  return {
+    txns: txns.sort(function(a,b){return a.date.localeCompare(b.date);}),
+    closingBalance: lastBalance
+  };
 }
 
 function splitCSV(line){
@@ -762,8 +819,13 @@ function parsePDF(items,rules){
   return txns.filter(function(t){return t.amount>0&&t.desc.length>1;}).map(function(t){
     var key=t.date+'|'+t.amount+'|'+t.type;if(seen.has(key))return null;seen.add(key);
     var cat='',subcat='';
-    for(var j=0;j<rules.length;j++){if(rules[j].keyword&&fuzzy(t.desc,rules[j].keyword)){cat=rules[j].category;subcat=rules[j].subcategory;break;}}
-    if(!cat&&t.type==='Deposit'){cat='Income';subcat='Other Income';}
+    for(var j=0;j<rules.length;j++){
+      if(rules[j].keyword&&fuzzyMatch(t.desc,rules[j].keyword)){
+        var applied=applyRule(rules[j],t.type);
+        if(applied){cat=applied.cat;subcat=applied.subcat;break;}
+      }
+    }
+    // Fix 2 & 5: No default — leave blank if no keyword matched
     return{date:t.date,desc:t.desc.trim(),amount:t.amount,type:t.type,cat:cat,subcat:subcat};
   }).filter(Boolean).sort(function(a,b){return a.date.localeCompare(b.date);});
 }
