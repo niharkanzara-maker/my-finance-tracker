@@ -334,7 +334,9 @@ async function renderSummary() {
   var expArr=Object.entries(expSubs).sort(function(a,b){return b[1]-a[1];});
   var incArr=Object.entries(incSubs).sort(function(a,b){return b[1]-a[1];});
   var astArr=Object.entries(astSubs).sort(function(a,b){return b[1]-a[1];});
-  var sug1=(income-expenses)*.6,sug2=(income-expenses)*.3,sug3=(income-expenses)*.2;
+  // Fix: savings for suggestion never negative
+  var savingsForSuggestion = Math.max(0, income - expenses);
+  var sug1=savingsForSuggestion*.6, sug2=savingsForSuggestion*.3, sug3=savingsForSuggestion*.2;
 
   var html='<div class="section"><div class="sec-title">Overview — '+MFULL[d.m]+' '+d.y+'</div>'
     +'<div class="grid3" style="margin-bottom:1rem">'
@@ -708,7 +710,6 @@ function applyRule(rule, type) {
 function parseCSV(text, rules) {
   var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
   var hIdx = -1;
-  var lastBalance = 0; // Fix 4: track closing balance
   for (var i=0; i<lines.length; i++) {
     var cols = splitCSV(lines[i]);
     if (cols[0] && cols[0].toLowerCase().replace(/[^a-z]/g,'').includes('sl')) { hIdx=i; break; }
