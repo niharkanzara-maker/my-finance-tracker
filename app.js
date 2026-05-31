@@ -167,11 +167,17 @@ async function generateUniqueId() {
   return '#' + String(last+1).padStart(4,'0');
 }
 
+// ── MONTH/YEAR FROM DATE (not dropdown) ──
+function getMonthYearFromDate(dateStr) {
+  var parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return { m: parseInt(parts[1]) - 1, y: parseInt(parts[0]) };
+  }
+  return getMonthYear();
+}
+
 function enterDash() {
   $('dash-badge').innerHTML = '<b>'+currentProfile.name+'</b> &nbsp;'+currentProfile.unique_id;
-  var now = new Date();
-  $('sel-month').value = now.getMonth();
-  $('sel-year').value  = now.getFullYear();
   showPage('pg-dash');
   switchTab('txn');
 }
@@ -302,8 +308,13 @@ async function saveTxnRow() {
   if(!date||!desc||!amount){setMsg(msgEl,'err','Please fill date, description and amount.');return;}
   if(!cat){setMsg(msgEl,'err','Please select a category.');return;}
   setMsg(msgEl,'info','Saving…');
-  var d=getMonthYear();
-  await sb.from('transactions').insert({user_id:currentUser.id,date:date,description:desc,amount:amount,type:type,category:cat,subcategory:subcat,month:d.m,year:d.y});
+  // Always use date to determine month/year — not dropdown
+  var d = getMonthYearFromDate(date);
+  await sb.from('transactions').insert({
+    user_id:currentUser.id, date:date, description:desc,
+    amount:amount, type:type, category:cat, subcategory:subcat,
+    month:d.m, year:d.y
+  });
   renderTxn();
 }
 async function deleteTxn(id) {
@@ -317,7 +328,10 @@ async function renderSummary() {
   var d=getMonthYear();
   showLoading('Loading summary…');
   var txns=await getTxns();
-  if(!txns.length){$('pg-dash-body').innerHTML='<div class="section"><div class="empty"><div class="empty-icon">📊</div>No transactions for '+MFULL[d.m]+' '+d.y+'.</div></div>';return;}
+  if(!txns.length){
+    $('pg-dash-body').innerHTML=monthYearSelector()+'<div class="section"><div class="empty"><div class="empty-icon">📊</div>No transactions for '+MFULL[d.m]+' '+d.y+'.</div></div>';
+    return;
+  }
   var income=0,expenses=0,assetsIn=0,assetsOut=0,liabIn=0,liabOut=0;
   var expSubs={},incSubs={},astSubs={};
   txns.forEach(function(t){
@@ -338,7 +352,8 @@ async function renderSummary() {
   var savingsForSuggestion = Math.max(0, income - expenses);
   var sug1=savingsForSuggestion*.6, sug2=savingsForSuggestion*.3, sug3=savingsForSuggestion*.2;
 
-  var html='<div class="section"><div class="sec-title">Overview — '+MFULL[d.m]+' '+d.y+'</div>'
+  var html=monthYearSelector()
+    +'<div class="section"><div class="sec-title">Overview — '+MFULL[d.m]+' '+d.y+'</div>'
     +'<div class="grid3" style="margin-bottom:1rem">'
     +'<div class="metric"><div class="lbl">Total income</div><div class="val" style="color:#00d4a0">'+fmt(income)+'</div></div>'
     +'<div class="metric"><div class="lbl">Total expenses</div><div class="val" style="color:#ff6b6b">'+fmt(expenses)+'</div></div>'
@@ -860,24 +875,19 @@ function updCat(i,cat){
 }
 
 async function doImport(){
-  var d=getMonthYear();
   var toAdd=pendingTxns.filter(function(t){return t.cat;});
   if(!toAdd.length){alert('Please select categories first.');return;}
-  var res=await sb.from('transactions').insert(toAdd.map(function(t){return{user_id:currentUser.id,date:t.date,description:t.desc,amount:t.amount,type:t.type,category:t.cat,subcategory:t.subcat,month:d.m,year:d.y};}));
+  var res=await sb.from('transactions').insert(toAdd.map(function(t){
+    // Always use transaction date to determine month/year — not dropdown
+    var d = getMonthYearFromDate(t.date);
+    return{
+      user_id:currentUser.id, date:t.date, description:t.desc,
+      amount:t.amount, type:t.type, category:t.cat, subcategory:t.subcat,
+      month:d.m, year:d.y
+    };
+  }));
   if(res.error){alert('Import failed: '+res.error.message);return;}
   switchTab('txn');
 }
 
-// ── MONTH/YEAR CHANGE ──
-document.addEventListener('change',function(e){
-  if(!currentUser)return;
-  if(e.target.id==='sel-month'||e.target.id==='sel-year'){
-    var a=document.querySelector('.tab.active');
-    if(!a)return;
-    var id=a.id;
-    if(id==='tab-txn')renderTxn();
-    else if(id==='tab-summary')renderSummary();
-    else if(id==='tab-networth')renderNetWorth();
-    else if(id==='tab-annual')renderAnnual();
-  }
-});
+// Month/year changes handled by onMonthYearChange() inline
