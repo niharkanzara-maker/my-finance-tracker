@@ -167,7 +167,23 @@ async function generateUniqueId() {
   return '#' + String(last+1).padStart(4,'0');
 }
 
-// ── MONTH/YEAR FROM DATE (not dropdown) ──
+// ── DEFAULT MONTH/YEAR (always available) ──
+var _defaultMonth = new Date().getMonth();
+var _defaultYear  = new Date().getFullYear();
+
+function getMonthYear() {
+  var selM = $('sel-month');
+  var selY = $('sel-year');
+  var m = (selM && selM.value !== '') ? parseInt(selM.value) : _defaultMonth;
+  var y = (selY && selY.value !== '') ? parseInt(selY.value) : _defaultYear;
+  if (isNaN(m)) m = _defaultMonth;
+  if (isNaN(y)) y = _defaultYear;
+  // cache for next call
+  _defaultMonth = m;
+  _defaultYear  = y;
+  return { m:m, y:y };
+}
+
 function getMonthYearFromDate(dateStr) {
   var parts = dateStr.split('-');
   if (parts.length === 3) {
@@ -175,8 +191,6 @@ function getMonthYearFromDate(dateStr) {
   }
   return getMonthYear();
 }
-
-function enterDash() {
   $('dash-badge').innerHTML = '<b>'+currentProfile.name+'</b> &nbsp;'+currentProfile.unique_id;
   showPage('pg-dash');
   switchTab('txn');
