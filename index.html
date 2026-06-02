@@ -105,14 +105,13 @@
       <div class="sec-title">Welcome to Demo mode</div>
       <p style="font-size:13px;color:#8b90a8;line-height:1.8">Create a profile to save your data, set keyword rules, and upload your bank statement.</p>
       <div style="margin-top:1rem;display:flex;gap:8px">
-        <button class="btn btn-green" onclick="logOut();setTimeout(()=>showPanel('signup'),100)">Create account</button>
+        <button class="btn btn-green" onclick="logOut();setTimeout(function(){showPanel('signup');},100)">Create account</button>
         <button class="btn" onclick="logOut()">Go home</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- app.js loaded last so all libraries are ready -->
 <script src="app.js"></script>
 </body>
 </html>
