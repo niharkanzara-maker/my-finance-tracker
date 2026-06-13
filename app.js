@@ -194,6 +194,7 @@ function openDemo() { showPage('pg-demo'); }
 
 function loginGoogle() {
   var provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
   auth.signInWithPopup(provider)
     .catch(function(e) {
       if (e.code !== 'auth/popup-closed-by-user') alert('Google Sign-In Error: ' + e.message);
