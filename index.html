@@ -21,10 +21,6 @@
     <header class="landing-header">
       <div class="landing-logo"><i class="ph ph-bank"></i> Finance Tracker</div>
       <div class="landing-nav">
-        <a href="#">Home</a>
-        <a href="#">Assets</a>
-        <a href="#">Markets</a>
-        <a href="#">Learn</a>
       </div>
       <div class="landing-actions">
         <button class="btn-ghost" onclick="showPanel('login')">Log In</button>
@@ -40,7 +36,7 @@
            <p class="hero-subtitle">Experience a premium personal finance platform tailored for you. Real-time insights, automated tracking, and sophisticated net worth analytics.</p>
            <div class="hero-cta">
              <button class="btn btn-blue btn-lg" onclick="showPanel('signup')">Start Your Journey <i class="ph ph-arrow-right"></i></button>
-             <button class="btn btn-outline btn-lg" onclick="openDemo()">View Demo</button>
+             <button class="btn btn-outline btn-lg" onclick="">User Guide</button>
            </div>
          </div>
          <div class="hero-visual">
@@ -95,11 +91,6 @@
          <button class="btn btn-blue btn-lg" onclick="showPanel('signup')">Get Started Now <i class="ph ph-rocket-launch"></i></button>
        </div>
        
-       <footer class="landing-footer">
-         <div class="lf-left"><i class="ph ph-bank"></i> Finance Tracker</div>
-         <div class="lf-links"><a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Help Center</a><a href="#">Security</a></div>
-         <div class="lf-right">© 2024 Finance Tracker. All rights reserved.</div>
-       </footer>
     </div>
 
     <!-- AUTH OVERLAYS -->
@@ -127,7 +118,9 @@
             <div class="msg" id="msg-signup"></div>
             <button class="btn btn-blue btn-block" onclick="signUp()">CREATE ACCOUNT</button>
             <div class="auth-divider"><span>OR CONTINUE WITH</span></div>
-            <button class="btn btn-google btn-block" onclick="loginGoogle()"><i class="ph ph-google-logo"></i> Sign up with Google</button>
+            <button class="btn btn-google btn-block" onclick="loginGoogle()">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo" style="width: 18px; height: 18px; margin-right: 8px; vertical-align: middle;"> Sign up with Google
+            </button>
             <div class="auth-footer-text">Already have an account? <a href="#" onclick="showPanel('login');return false;">Log In</a></div>
           </div>
         </div>
@@ -149,7 +142,9 @@
             <button class="btn btn-blue btn-block" style="margin-top:0.5rem" onclick="logIn()">Sign In</button>
             <button class="btn btn-outline btn-block" style="margin-top:0.5rem" onclick="sendMagicLink()"><i class="ph ph-envelope-simple"></i> Send Magic Link</button>
             <div class="auth-divider"><span>OR</span></div>
-            <button class="btn btn-google btn-block" onclick="loginGoogle()"><i class="ph ph-google-logo"></i> Continue with Google</button>
+            <button class="btn btn-google btn-block" onclick="loginGoogle()">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo" style="width: 18px; height: 18px; margin-right: 8px; vertical-align: middle;"> Continue with Google
+            </button>
             <div class="auth-footer-text">Don't have an account? <a href="#" onclick="showPanel('signup');return false;">Sign up.</a></div>
           </div>
         </div>
@@ -172,10 +167,7 @@
         <span class="auth-sec-badge"><i class="ph ph-shield-check"></i> SEC TIER 4 SECURITY</span>
         <span class="auth-sec-badge"><i class="ph ph-lock-key"></i> 256-BIT ENCRYPTED</span>
       </div>
-      <div class="auth-copyright">
-        <div class="ac-left">© 2024 Finance Tracker. All rights reserved.</div>
-        <div class="ac-right"><a href="#">Privacy Policy</a> <a href="#">Terms of Service</a> <a href="#">Help Center</a> <a href="#">Security</a></div>
-      </div>
+
     </div>
   </div>
 </div>
