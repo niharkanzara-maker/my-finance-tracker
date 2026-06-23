@@ -112,9 +112,20 @@ function onSelChange() {
 
 // ── PANEL ──
 function showPanel(t) {
-  $('home-cards').style.display  = (t==='none'||t==='')?'block':'none';
-  $('panel-signup').style.display = t==='signup'?'block':'none';
-  $('panel-login').style.display  = t==='login'?'block':'none';
+  var lm = $('landing-main'); if(lm) lm.style.display = (t==='none'||t==='')?'block':'none';
+  var ao = $('auth-overlay'); if(ao) ao.className = (t==='none'||t==='')?'hide':'';
+  if(t==='none'||t==='') return;
+  var su = $('panel-signup'); if(su) su.className = t==='signup'?'auth-panel':'auth-panel hide';
+  var lo = $('panel-login');  if(lo) lo.className = t==='login'?'auth-panel':'auth-panel hide';
+  var fp = $('panel-forgot'); if(fp) fp.className = t==='forgot'?'auth-panel':'auth-panel hide';
+}
+
+function forgotPasswordAction() {
+  var email = $('inp-forgot-email').value.trim();
+  if (!email) { setMsg($('msg-forgot'), 'err', 'Please enter your email address first.'); return; }
+  auth.sendPasswordResetEmail(email)
+    .then(function() { setMsg($('msg-forgot'), 'ok', 'Password reset email sent! Check your inbox.'); })
+    .catch(function(e) { setMsg($('msg-forgot'), 'err', e.message); });
 }
 
 // ── AUTH ──
