@@ -261,6 +261,31 @@
   </div>
 </div>
 
+<!-- SPLIT TXN MODAL -->
+<div id="modal-split" class="modal hide">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Split Transaction</h3>
+      <button class="close-btn" onclick="closeSplitModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="split-info">
+        <div class="split-orig">Original Amount: <b id="split-orig-amt">₹0</b></div>
+        <div class="split-rem">Remaining to Allocate: <b id="split-rem-amt">₹0</b></div>
+      </div>
+      <div id="split-rows">
+        <!-- Split rows go here -->
+      </div>
+      <button class="btn btn-sm btn-outline mt-2" onclick="addSplitRow()">+ Add Allocation</button>
+    </div>
+    <div class="modal-footer">
+      <div class="msg" id="msg-split"></div>
+      <button class="btn" onclick="closeSplitModal()">Cancel</button>
+      <button class="btn btn-blue" id="btn-save-split" onclick="saveSplitTxn()">Save Split</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js?v=2"></script>
 </body>
 </html>

@@ -588,16 +588,28 @@ function renderTxn() {
         var icon = isDep ? 'ph-money' : 'ph-shopping-bag';
         var catColor = CAT_COLORS[t.category]||'#8892b0';
         
+        var txnNoHtml = t.txn_no ? '<span style="font-size:9px;color:var(--blue);font-weight:bold;margin-right:6px">['+t.txn_no+']</span>' : '';
+        var splitTagHtml = t.split_group_id ? '<span style="font-size:9px;color:#a855f7;margin-left:6px;border:1px solid #a855f7;padding:1px 4px;border-radius:4px">SPLIT</span>' : '';
+        
+        var actionsHtml = '';
+        if (t.split_group_id) {
+          actionsHtml = '<button class="icon-btn" title="Edit Split Group" onclick="editSplitGroup(\''+t.split_group_id+'\')"><i class="ph ph-pencil-simple" style="font-size:16px;color:var(--text-secondary)"></i></button>' +
+                        '<button class="icon-btn" title="Delete Split Group" onclick="deleteSplitGroup(\''+t.split_group_id+'\')"><i class="ph ph-trash" style="font-size:16px;color:#ef4444"></i></button>';
+        } else {
+          actionsHtml = '<button class="icon-btn" title="Split Transaction" onclick="openSplitModal(\''+t.id+'\', '+t.amount+')"><i class="ph ph-git-branch" style="font-size:16px;color:var(--text-secondary)"></i></button>' +
+                        '<button class="icon-btn" onclick="deleteTxn(\''+t.id+'\')"><i class="ph ph-trash" style="font-size:16px;color:var(--text-secondary)"></i></button>';
+        }
+
         html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.02);transition:var(--transition)" onmouseover="this.style.backgroundColor=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.backgroundColor=\'transparent\'">'
           +'<td style="padding:16px 20px;font-size:13px;color:var(--text-secondary);white-space:nowrap">'+dateStr+'</td>'
           +'<td style="padding:16px 20px;display:flex;align-items:center;gap:12px">'
             +'<div style="width:32px;height:32px;border-radius:8px;background:var(--bg-card2);display:flex;align-items:center;justify-content:center;color:var(--text-primary)"><i class="ph '+icon+'"></i></div>'
-            +'<div><div style="font-weight:600;font-size:13px;color:var(--text-primary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+t.description+'">'+t.description+'</div><div style="font-size:10px;color:var(--text-secondary)">'+(t.subcategory||t.category||'Other')+'</div></div>'
+            +'<div><div style="font-weight:600;font-size:13px;color:var(--text-primary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+t.description+'">'+txnNoHtml+t.description+splitTagHtml+'</div><div style="font-size:10px;color:var(--text-secondary)">'+(t.subcategory||t.category||'Other')+'</div></div>'
           +'</td>'
           +'<td style="padding:16px 20px"><span class="tag tg" style="background:'+catColor+'15;color:'+catColor+';border:1px solid '+catColor+'33;font-size:9px;letter-spacing:0.05em;text-transform:uppercase">'+(t.category||'Uncategorized')+'</span></td>'
           +'<td style="padding:16px 20px;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue)"></span>Completed</td>'
           +'<td style="padding:16px 20px;text-align:right;font-weight:600;font-size:14px;color:'+(isDep?'var(--green)':'var(--red)')+'">'+(isDep?'+':'-')+fmt(t.amount)+'</td>'
-          +'<td style="padding:16px 20px;text-align:right"><button class="icon-btn" onclick="deleteTxn(\''+t.id+'\')"><i class="ph ph-trash" style="font-size:16px;color:var(--text-secondary)"></i></button></td>'
+          +'<td style="padding:16px 20px;text-align:right">'+actionsHtml+'</td>'
           +'</tr>';
       });
       html += '</tbody></table></div>'
@@ -1491,3 +1503,147 @@ function doImport(){
 
 
 
+// ── SPLIT TRANSACTIONS ──
+var currentSplitTxnId = null;
+var currentSplitGroupId = null;
+var currentSplitTotal = 0;
+var splitRowsData = [];
+
+function openSplitModal(txnId, amount) {
+  currentSplitTxnId = txnId;
+  currentSplitGroupId = null;
+  currentSplitTotal = parseFloat(amount);
+  
+  $('split-orig-amt').innerText = '₹' + fmt(currentSplitTotal);
+  splitRowsData = [];
+  addSplitRow(); // add two rows by default for new split
+  addSplitRow();
+  
+  renderSplitRows();
+  $('modal-split').classList.remove('hide');
+  $('msg-split').innerHTML = '';
+}
+
+function editSplitGroup(groupId) {
+  currentSplitGroupId = groupId;
+  currentSplitTxnId = null;
+  
+  // Find all txns in this group
+  getAllTxns().then(function(allTxns) {
+    var groupTxns = allTxns.filter(function(t) { return t.split_group_id === groupId; });
+    if(groupTxns.length === 0) return;
+    
+    currentSplitTotal = groupTxns.reduce(function(sum, t) { return sum + parseFloat(t.amount); }, 0);
+    $('split-orig-amt').innerText = '₹' + fmt(currentSplitTotal);
+    
+    splitRowsData = groupTxns.map(function(t) {
+      return {
+        amount: parseFloat(t.amount),
+        type: t.type,
+        category: t.category,
+        subcategory: t.subcategory
+      };
+    });
+    
+    renderSplitRows();
+    $('modal-split').classList.remove('hide');
+    $('msg-split').innerHTML = '';
+  });
+}
+
+function closeSplitModal() {
+  $('modal-split').classList.add('hide');
+}
+
+function addSplitRow() {
+  splitRowsData.push({ amount: '', type: 'Withdrawal', category: '', subcategory: '' });
+  renderSplitRows();
+}
+
+function removeSplitRow(index) {
+  splitRowsData.splice(index, 1);
+  renderSplitRows();
+}
+
+function renderSplitRows() {
+  var html = '';
+  var currentSum = 0;
+  
+  splitRowsData.forEach(function(row, i) {
+    var amt = parseFloat(row.amount) || 0;
+    currentSum += amt;
+    
+    var catOptions = '<option value="">Category</option>' + Object.keys(CAT_MAP).map(function(c){return'<option '+(row.category===c?'selected':'')+'>'+c+'</option>';}).join('');
+    var subOptions = '<option value="">Subcat</option>' + (CAT_MAP[row.category]||[]).map(function(s){return'<option '+(row.subcategory===s?'selected':'')+'>'+s+'</option>';}).join('');
+    
+    html += '<div class="split-row">'
+      +'<input type="number" class="split-amt" placeholder="Amount" value="'+(row.amount||'')+'" oninput="updateSplitData('+i+', \'amount\', this.value)">'
+      +'<select class="split-cat" oninput="updateSplitData('+i+', \'type\', this.value)"><option '+(row.type==='Withdrawal'?'selected':'')+'>Withdrawal</option><option '+(row.type==='Deposit'?'selected':'')+'>Deposit</option></select>'
+      +'<select class="split-cat" onchange="updateSplitData('+i+', \'category\', this.value)">'+catOptions+'</select>'
+      +'<select class="split-cat" id="split-sub-'+i+'" onchange="updateSplitData('+i+', \'subcategory\', this.value)">'+subOptions+'</select>'
+      +'<div class="split-row-del" onclick="removeSplitRow('+i+')">&times;</div>'
+      +'</div>';
+  });
+  
+  $('split-rows').innerHTML = html;
+  
+  var rem = currentSplitTotal - currentSum;
+  var remEl = $('split-rem-amt');
+  remEl.innerText = '₹' + fmt(rem);
+  remEl.style.color = (Math.abs(rem) < 0.01) ? 'var(--green)' : 'var(--red)';
+  
+  $('btn-save-split').disabled = (Math.abs(rem) > 0.01);
+}
+
+function updateSplitData(index, field, value) {
+  splitRowsData[index][field] = value;
+  if (field === 'category') {
+    splitRowsData[index].subcategory = '';
+  }
+  renderSplitRows();
+}
+
+function saveSplitTxn() {
+  var rem = currentSplitTotal - splitRowsData.reduce(function(s, r){ return s + (parseFloat(r.amount)||0); }, 0);
+  if (Math.abs(rem) > 0.01) {
+    setMsg($('msg-split'), 'err', 'Remaining amount must be exactly 0.');
+    return;
+  }
+  
+  for(var i=0; i<splitRowsData.length; i++) {
+    var r = splitRowsData[i];
+    if (!r.amount || !r.category) {
+      setMsg($('msg-split'), 'err', 'Please fill amount and category for all rows.');
+      return;
+    }
+  }
+  
+  setMsg($('msg-split'), 'info', 'Saving split...');
+  
+  var rpcName = currentSplitGroupId ? 'update_split_group' : 'split_transaction';
+  var payload = {
+    p_splits: splitRowsData
+  };
+  
+  if (currentSplitGroupId) {
+    payload.p_split_group_id = currentSplitGroupId;
+  } else {
+    payload.p_original_txn_id = currentSplitTxnId;
+    payload.p_split_group_id = 'SPLIT-' + crypto.randomUUID();
+  }
+  
+  sb.rpc(rpcName, payload).then(function(res) {
+    if (res.error) {
+      setMsg($('msg-split'), 'err', res.error.message || 'Database error occurred.');
+      console.error(res.error);
+    } else {
+      closeSplitModal();
+      renderTxn();
+    }
+  });
+}
+
+function deleteSplitGroup(groupId) {
+  if(!confirm('Are you sure you want to delete this entire split group?')) return;
+  sb.from('transactions').delete().eq('split_group_id', groupId).then(function(){ renderTxn(); });
+}
