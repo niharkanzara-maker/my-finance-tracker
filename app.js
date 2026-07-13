@@ -246,12 +246,12 @@ function loadProfile() {
           sb.from('profiles').insert({ id:currentUser.id, name:name, unique_id:uid, bank:'kotak' })
             .then(function() {
               sb.from('profiles').select('*').eq('id', currentUser.id).single()
-                .then(function(r) { currentProfile = r.data; enterDash(); });
+                .then(function(r) { currentProfile = r.data; loadCustomSubcategories(enterDash); });
             });
         });
       } else {
         currentProfile = res.data;
-        enterDash();
+        loadCustomSubcategories(enterDash);
       }
     })
     .catch(function(e) { console.error('Profile error:', e); auth.signOut(); });
@@ -290,12 +290,12 @@ function handleSearch(val) {
 // ── TABS & SIDEBAR ──
 function switchTab(t) {
   var titles = {
-    'txn': 'Transactions',
-    'snapshot': 'Monthly Snapshot Entry',
+    'txn': 'Confirmed Transactions',
+    'snapshot': 'Monthly Snapshot',
     'summary': 'Monthly Summary',
     'networth': 'Net Worth Monitoring',
     'annual': 'Annual Analysis',
-    'rules': 'Automation Rules',
+    'rules': 'Categorization Rules',
     'upload': 'Upload Statement'
   };
   var titleEl = $('page-title');
@@ -434,7 +434,8 @@ var filterState = {
   endDate: '',
   category: 'All Categories', // 'All Categories', 'Income', 'Expenses', 'Assets', 'Liabilities'
   minAmount: '',
-  type: 'ALL' // 'ALL', 'INCOME', 'EXPENSES'
+  type: 'ALL', // 'ALL', 'INCOME', 'EXPENSES'
+  bank: 'All Banks'
 };
 
 function applyFilters() {
@@ -444,12 +445,13 @@ function applyFilters() {
     filterState.endDate = $('filt-end').value;
   }
   filterState.category = $('filt-cat') ? $('filt-cat').value : 'All Categories';
+  filterState.bank = $('filt-bank') ? $('filt-bank').value : 'All Banks';
   filterState.minAmount = $('filt-min') ? $('filt-min').value : '';
   renderTxn();
 }
 
 function clearFilters() {
-  filterState = { dateRange: 'Current Month', startDate: '', endDate: '', category: 'All Categories', minAmount: '', type: 'ALL' };
+  filterState = { dateRange: 'Current Month', startDate: '', endDate: '', category: 'All Categories', minAmount: '', type: 'ALL', bank: 'All Banks' };
   globalSearchTerm = '';
   if ($('global-search')) $('global-search').value = '';
   renderTxn();
@@ -488,7 +490,10 @@ function renderTxn() {
       // 4. Min Amount
       if (filterState.minAmount !== '' && parseFloat(t.amount) < parseFloat(filterState.minAmount)) return false;
       
-      // 5. Date Range
+      // 5. Bank Name
+      if (filterState.bank !== 'All Banks' && t.bank_name !== filterState.bank) return false;
+      
+      // 6. Date Range
       var tDate = new Date(t.date);
       var now = new Date();
       if (filterState.dateRange === 'Current Month') {
@@ -528,9 +533,13 @@ function renderTxn() {
     html += '</div>';
 
     // Filters Bar
-    html += '<div class="grid4" style="margin-bottom:1.5rem;align-items:end">';
+    var uniqueBanks = [...new Set(allTxns.filter(function(t){ return t.bank_name; }).map(function(t){ return t.bank_name; }))].sort();
+    var bankOpts = '<option '+(filterState.bank==='All Banks'?'selected':'')+'>All Banks</option>';
+    uniqueBanks.forEach(function(b) { bankOpts += '<option '+(filterState.bank===b?'selected':'')+'>'+b+'</option>'; });
+
+    html += '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:1.5rem;align-items:end">';
     
-    html += '<div class="field"><label>Date Range</label><div style="position:relative"><i class="ph ph-calendar-blank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
+    html += '<div class="field" style="flex:1;min-width:150px"><label>Date Range</label><div style="position:relative"><i class="ph ph-calendar-blank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
       +'<select id="filt-date" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 36px;appearance:none;color:var(--text-primary)" onchange="updateDateRangeUI()">'
       +'<option '+(filterState.dateRange==='Current Month'?'selected':'')+'>Current Month</option>'
       +'<option '+(filterState.dateRange==='Last 30 Days'?'selected':'')+'>Last 30 Days</option>'
@@ -539,7 +548,7 @@ function renderTxn() {
       +'<option '+(filterState.dateRange==='Custom Range'?'selected':'')+'>Custom Range</option>'
       +'</select><i class="ph ph-caret-down" style="position:absolute;right:12px;top:12px;color:var(--text-secondary);pointer-events:none"></i></div></div>';
       
-    html += '<div class="field"><label>Category</label><div style="position:relative"><i class="ph ph-intersect" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
+    html += '<div class="field" style="flex:1;min-width:150px"><label>Category</label><div style="position:relative"><i class="ph ph-intersect" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
       +'<select id="filt-cat" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 36px;appearance:none;color:var(--text-primary)">'
       +'<option '+(filterState.category==='All Categories'?'selected':'')+'>All Categories</option>'
       +'<option '+(filterState.category==='Income'?'selected':'')+'>Income</option>'
@@ -548,7 +557,12 @@ function renderTxn() {
       +'<option '+(filterState.category==='Liabilities'?'selected':'')+'>Liabilities</option>'
       +'</select><i class="ph ph-caret-down" style="position:absolute;right:12px;top:12px;color:var(--text-secondary);pointer-events:none"></i></div></div>';
       
-    html += '<div class="field"><label>Min. Amount (₹)</label><div style="position:relative"><i class="ph ph-currency-inr" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i><input type="number" id="filt-min" value="'+filterState.minAmount+'" placeholder="0.00" style="padding-left:36px"></div></div>';
+    html += '<div class="field" style="flex:1;min-width:150px"><label>Bank</label><div style="position:relative"><i class="ph ph-bank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
+      +'<select id="filt-bank" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 36px;appearance:none;color:var(--text-primary)">'
+      +bankOpts
+      +'</select><i class="ph ph-caret-down" style="position:absolute;right:12px;top:12px;color:var(--text-secondary);pointer-events:none"></i></div></div>';
+      
+    html += '<div class="field" style="flex:1;min-width:120px"><label>Min. Amount (₹)</label><div style="position:relative"><i class="ph ph-currency-inr" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i><input type="number" id="filt-min" value="'+filterState.minAmount+'" placeholder="0.00" style="padding-left:36px"></div></div>';
     
     html += '<div style="display:flex;gap:8px;height:42px"><button class="btn btn-blue-glow" style="flex:1" onclick="applyFilters()">Apply</button><button class="btn" style="flex:1" onclick="clearFilters()">Clear</button></div>';
     html += '</div>';
@@ -570,7 +584,7 @@ function renderTxn() {
       +'<div class="field"><label>Category</label><select id="new-cat" onchange="updateSubDrop(\'new-subcat\',\'new-cat\')"><option value="">Select category</option>'
       +Object.keys(CAT_MAP).map(function(c){return'<option>'+c+'</option>';}).join('')
       +'</select></div>'
-      +'<div class="field"><label>Sub-category</label><select id="new-subcat"><option value="">Select sub-category</option></select></div>'
+      +'<div class="field"><label>Subcategory</label><select id="new-subcat" onchange="handleSubcatChange(this, $(\'new-cat\').value)"><option value="">Select sub-category</option></select></div>'
       +'</div>'
       +'<div style="display:flex;gap:8px;justify-content:flex-end">'
       +'<button class="btn" onclick="toggleAddForm()">Cancel</button>'
@@ -578,9 +592,13 @@ function renderTxn() {
       +'</div><div class="msg" id="txn-form-msg"></div></div>';
 
     if (filtered.length) {
-      html += '<div class="section" style="padding:0;overflow:hidden"><div class="tbl-wrap" style="overflow-x:auto"><table class="data-tbl" style="width:100%;border-collapse:collapse;text-align:left"><thead><tr style="border-bottom:1px solid var(--border);font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.1em">'
-        +'<th style="padding:16px 20px">Date</th><th style="padding:16px 20px">Description</th><th style="padding:16px 20px">Category</th><th style="padding:16px 20px">Status</th><th style="padding:16px 20px;text-align:right">Amount</th><th style="padding:16px 20px;text-align:right"></th>'
+      html += '<div style="display:flex;justify-content:flex-end;margin-bottom:1rem;"><button class="btn btn-red" id="btn-delete-dash" style="opacity:0.5;pointer-events:none;" onclick="deleteSelectedDash()">Delete Selected (0)</button></div>'
+        +'<div class="section" style="padding:0;overflow:hidden"><div class="tbl-wrap" style="overflow-x:auto"><table class="data-tbl" style="width:100%;border-collapse:collapse;text-align:left"><thead><tr style="border-bottom:1px solid var(--border);font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.1em">'
+        +'<th style="width:40px;text-align:center;"><input type="checkbox" id="selectAllDash" onchange="toggleAllDash(this.checked)"></th>'
+        +'<th style="padding:16px 20px">Date</th><th style="padding:16px 20px">Description</th><th style="padding:16px 20px">Bank Name</th><th style="padding:16px 20px">Category</th><th style="padding:16px 20px">Subcategory</th><th style="padding:16px 20px;text-align:right">Amount</th><th style="padding:16px 20px;text-align:right">Action</th>'
         +'</tr></thead><tbody>';
+      
+      window.dashboardTxns = filtered;
       filtered.forEach(function(t) {
         var isDep = t.type==='Deposit';
         var dObj = new Date(t.date);
@@ -591,23 +609,18 @@ function renderTxn() {
         var txnNoHtml = t.txn_no ? '<span style="font-size:9px;color:var(--blue);font-weight:bold;margin-right:6px">['+t.txn_no+']</span>' : '';
         var splitTagHtml = t.split_group_id ? '<span style="font-size:9px;color:#a855f7;margin-left:6px;border:1px solid #a855f7;padding:1px 4px;border-radius:4px">SPLIT</span>' : '';
         
-        var actionsHtml = '';
-        if (t.split_group_id) {
-          actionsHtml = '<button class="icon-btn" title="Edit Split Group" onclick="editSplitGroup(\''+t.split_group_id+'\')"><i class="ph ph-pencil-simple" style="font-size:16px;color:var(--text-secondary)"></i></button>' +
-                        '<button class="icon-btn" title="Delete Split Group" onclick="deleteSplitGroup(\''+t.split_group_id+'\')"><i class="ph ph-trash" style="font-size:16px;color:#ef4444"></i></button>';
-        } else {
-          actionsHtml = '<button class="icon-btn" title="Split Transaction" onclick="openSplitModal(\''+t.id+'\', '+t.amount+')"><i class="ph ph-git-branch" style="font-size:16px;color:var(--text-secondary)"></i></button>' +
-                        '<button class="icon-btn" onclick="deleteTxn(\''+t.id+'\')"><i class="ph ph-trash" style="font-size:16px;color:var(--text-secondary)"></i></button>';
-        }
+        var actionsHtml = '<button class="icon-btn" onclick="openDashActionMenu(event, \''+t.id+'\', '+(t.split_group_id?'\''+t.split_group_id+'\'':'null')+')"><i class="ph ph-dots-three-vertical" style="font-size:18px;color:var(--text-secondary)"></i></button>';
 
         html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.02);transition:var(--transition)" onmouseover="this.style.backgroundColor=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.backgroundColor=\'transparent\'">'
+          +'<td style="text-align:center;"><input type="checkbox" class="dash-cb pending-cb" value="'+t.id+'" onchange="checkDashActions()"></td>'
           +'<td style="padding:16px 20px;font-size:13px;color:var(--text-secondary);white-space:nowrap">'+dateStr+'</td>'
           +'<td style="padding:16px 20px;display:flex;align-items:center;gap:12px">'
             +'<div style="width:32px;height:32px;border-radius:8px;background:var(--bg-card2);display:flex;align-items:center;justify-content:center;color:var(--text-primary)"><i class="ph '+icon+'"></i></div>'
             +'<div><div style="font-weight:600;font-size:13px;color:var(--text-primary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+t.description+'">'+txnNoHtml+t.description+splitTagHtml+'</div><div style="font-size:10px;color:var(--text-secondary)">'+(t.subcategory||t.category||'Other')+'</div></div>'
           +'</td>'
+          +'<td style="padding:16px 20px"><span class="badge" style="background:var(--bg-card2);color:var(--text-primary);border:1px solid var(--border);font-size:11px;padding:2px 6px;">'+(t.bank_name || '-')+'</span></td>'
           +'<td style="padding:16px 20px"><span class="tag tg" style="background:'+catColor+'15;color:'+catColor+';border:1px solid '+catColor+'33;font-size:9px;letter-spacing:0.05em;text-transform:uppercase">'+(t.category||'Uncategorized')+'</span></td>'
-          +'<td style="padding:16px 20px;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue)"></span>Completed</td>'
+          +'<td style="padding:16px 20px"><span class="tag tg" style="background:'+catColor+'15;color:'+catColor+';border:1px solid '+catColor+'33;font-size:9px;letter-spacing:0.05em;text-transform:uppercase">'+(t.subcategory||'None')+'</span></td>'
           +'<td style="padding:16px 20px;text-align:right;font-weight:600;font-size:14px;color:'+(isDep?'var(--green)':'var(--red)')+'">'+(isDep?'+':'-')+fmt(t.amount)+'</td>'
           +'<td style="padding:16px 20px;text-align:right">'+actionsHtml+'</td>'
           +'</tr>';
@@ -633,7 +646,7 @@ function toggleAddForm() {
 }
 function updateSubDrop(subId, catId) {
   var cat=$(catId).value, sub=$(subId);
-  sub.innerHTML='<option value="">Select sub-category</option>'+(CAT_MAP[cat]||[]).map(function(s){return'<option>'+s+'</option>';}).join('');
+  sub.innerHTML = getSubcatOptionsHTML(cat, '');
 }
 function saveTxnRow() {
   var date=$('new-date').value, desc=$('new-desc').value.trim();
@@ -989,7 +1002,7 @@ function renderNetWorth() {
          dataNW.push(0); // If before earliest
       }
       pM++;
-      if(pM>12){ pM=1; pY++; }
+      if(pM>12){ pM=1; cY++; }
     }
     
     var html = '<div style="display:grid;grid-template-columns:1fr;gap:1.5rem;margin-bottom:1.5rem">';
@@ -1193,18 +1206,18 @@ function renderRules() {
 function addRuleRow(kw,cat,subcat){
   kw=kw||'';cat=cat||'';subcat=subcat||'';
   var tbody=$('rules-body'),tr=document.createElement('tr');
-  var subOpts=cat&&CAT_MAP[cat]?CAT_MAP[cat].map(function(s){return'<option '+(s===subcat?'selected':'')+'>'+s+'</option>';}).join(''):'';
+  var subOpts=getSubcatOptionsHTML(cat, subcat);
   tr.innerHTML='<td><input type="text" placeholder="e.g. SWIGGY, SALARY" value="'+kw+'" style="text-transform:uppercase"></td>'
     +'<td><select onchange="updateSubInRow(this)"><option value="">Select</option>'
     +Object.keys(CAT_MAP).map(function(c){return'<option '+(c===cat?'selected':'')+'>'+c+'</option>';}).join('')
     +'</select></td>'
-    +'<td><select><option value="">Select sub-category</option>'+subOpts+'</select></td>'
-    +'<td><button class="btn btn-sm btn-red" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+    +'<td><select onchange="handleSubcatChange(this, this.closest(\'tr\').cells[1].querySelector(\'select\').value)">'+subOpts+'</select></td>'
+    +'<td><button class="btn btn-outline" style="padding:6px;border-color:var(--border);color:var(--text-secondary)" onclick="this.closest(\'tr\').remove()"><i class="ph ph-trash"></i></button></td>';
   tbody.appendChild(tr);
 }
 function updateSubInRow(sel){
   var cat=sel.value,subSel=sel.closest('tr').cells[2].querySelector('select');
-  subSel.innerHTML='<option value="">Select sub-category</option>'+(CAT_MAP[cat]||[]).map(function(s){return'<option>'+s+'</option>';}).join('');
+  subSel.innerHTML=getSubcatOptionsHTML(cat, '');
 }
 function saveRules(){
   var rows=[].slice.call($('rules-body').querySelectorAll('tr'));
@@ -1468,14 +1481,14 @@ function showConfirm(txns){
   txns.forEach(function(t,i){
     var um=!t.cat;
     var cO='<option value="">Select</option>'+Object.keys(CAT_MAP).map(function(c){return'<option value="'+c+'" '+(c===t.cat?'selected':'')+'>'+c+'</option>';}).join('');
-    var sO='<option value="">Select sub-category</option>'+(t.cat&&CAT_MAP[t.cat]?CAT_MAP[t.cat].map(function(s){return'<option '+(s===t.subcat?'selected':'')+'>'+s+'</option>';}).join(''):'');
+    var sO=getSubcatOptionsHTML(t.cat, t.subcat);
     html+='<tr class="'+(um?'unmatched':'')+'">'
       +'<td style="white-space:nowrap">'+t.date+'</td>'
       +'<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+t.desc+'">'+t.desc+'</td>'
       +'<td><span class="badge '+(t.type==='Deposit'?'b-dep':'b-wit')+'">'+t.type+'</span></td>'
       +'<td style="text-align:right;font-weight:600;white-space:nowrap">'+fmt(t.amount)+'</td>'
       +'<td><select onchange="updCat('+i+',this.value)">'+cO+'</select></td>'
-      +'<td><select id="cs-'+i+'" onchange="pendingTxns['+i+'].subcat=this.value">'+sO+'</select></td>'
+      +'<td><select id="cs-'+i+'" onchange="handleSubcatChange(this, pendingTxns['+i+'].cat, function(v){pendingTxns['+i+'].subcat=v;})">'+sO+'</select></td>'
       +'</tr>';
   });
   $('confirm-body').innerHTML=html;
@@ -1485,8 +1498,8 @@ function showConfirm(txns){
 function updCat(i,cat){
   pendingTxns[i].cat=cat; pendingTxns[i].subcat='';
   var s=$('cs-'+i);
-  s.innerHTML='<option value="">Select sub-category</option>'+(CAT_MAP[cat]||[]).map(function(x){return'<option>'+x+'</option>';}).join('');
-  s.onchange=function(){pendingTxns[i].subcat=s.value;};
+  s.innerHTML=getSubcatOptionsHTML(cat, '');
+  s.onchange=function(){handleSubcatChange(s, cat, function(v){pendingTxns[i].subcat=v;});};
 }
 
 function doImport(){
@@ -1500,8 +1513,6 @@ function doImport(){
     switchTab('txn');
   });
 }
-
-
 
 // ── SPLIT TRANSACTIONS ──
 var currentSplitTxnId = null;
@@ -1574,13 +1585,13 @@ function renderSplitRows() {
     currentSum += amt;
     
     var catOptions = '<option value="">Category</option>' + Object.keys(CAT_MAP).map(function(c){return'<option '+(row.category===c?'selected':'')+'>'+c+'</option>';}).join('');
-    var subOptions = '<option value="">Subcat</option>' + (CAT_MAP[row.category]||[]).map(function(s){return'<option '+(row.subcategory===s?'selected':'')+'>'+s+'</option>';}).join('');
+    var subOptions = getSubcatOptionsHTML(row.category, row.subcategory);
     
     html += '<div class="split-row">'
       +'<input type="number" class="split-amt" placeholder="Amount" value="'+(row.amount||'')+'" oninput="updateSplitData('+i+', \'amount\', this.value)">'
       +'<select class="split-cat" oninput="updateSplitData('+i+', \'type\', this.value)"><option '+(row.type==='Withdrawal'?'selected':'')+'>Withdrawal</option><option '+(row.type==='Deposit'?'selected':'')+'>Deposit</option></select>'
       +'<select class="split-cat" onchange="updateSplitData('+i+', \'category\', this.value)">'+catOptions+'</select>'
-      +'<select class="split-cat" id="split-sub-'+i+'" onchange="updateSplitData('+i+', \'subcategory\', this.value)">'+subOptions+'</select>'
+      +'<select class="split-cat" id="split-sub-'+i+'" onchange="handleSubcatChange(this, splitRowsData['+i+'].category, function(v){updateSplitData('+i+', \'subcategory\', v)})">'+subOptions+'</select>'
       +'<div class="split-row-del" onclick="removeSplitRow('+i+')">&times;</div>'
       +'</div>';
   });
@@ -1646,4 +1657,752 @@ function saveSplitTxn() {
 function deleteSplitGroup(groupId) {
   if(!confirm('Are you sure you want to delete this entire split group?')) return;
   sb.from('transactions').delete().eq('split_group_id', groupId).then(function(){ renderTxn(); });
+}
+
+
+
+// --- UNIFIED UPLOAD V2 OVERRIDES ---
+window.renderUpload = function() {
+  var pg = document.getElementById('pg-dash-body');
+  if(!pg) return;
+  
+  var cy = new Date().getFullYear();
+  var ys = '<option value="all">All Years</option>'; for(var y=cy; y>=cy-5; y--) ys += '<option value="'+y+'">'+y+'</option>';
+  
+  pg.innerHTML = '<div class="section"><div class="sec-title">Upload bank statement</div>'
+    +'<p style="font-size:12px;color:#8892b0;margin-bottom:1.25rem;line-height:1.7">Upload your CSV or Excel statement.</p>'
+    +'<div style="margin-bottom: 1rem;"><label style="font-size: 13px; color:#ccd6f6; margin-right: 10px;">Select Bank:</label>'
+    +'<select id="bank-selector" style="padding: 6px 12px; border-radius: 4px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border);">'
+    +'<option value="kotak">Kotak Mahindra Bank</option><option value="sbi">SBI</option><option value="hdfc">HDFC Bank</option></select></div>'
+    +'<div class="upload-zone" id="zone-unified" style="border: 2px dashed #233554; padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px; max-width: 600px; margin: 0 auto;"><div class="u-ico" style="margin-bottom: 0.5rem;"><i class="ph ph-folder-open" style="font-size:32px;color:var(--text-secondary)"></i></div><p>Click or drag to select <b>CSV or Excel statement</b></p></div>'
+    +'<input type="file" id="file-unified" accept=".csv,.xlsx,.xls" style="display:none">'
+    +'<div class="msg" id="upload-msg" style="margin-top:.75rem;font-size:13px"></div></div>'
+    +'<div id="confirm-sec" style="display:none"><div class="section">'
+    +'<div class="sec-title" style="display:flex; justify-content:space-between; align-items:center;">'
+    +'  <span>Review & Confirm Uploaded transactions <span id="txn-count" style="font-size:12px;color:#8892b0;font-weight:400;margin-left:8px;"></span></span>'
+    +'  <div><button class="btn btn-outline" id="btn-del-selected" style="padding: 6px 16px; font-size:13px; margin-right:8px; display:none; border-color:#ef4444; color:#ef4444;" onclick="deleteSelectedPending()">Delete Selected</button>'
+    +'  <button class="btn btn-green" id="btn-confirm-all" style="padding: 6px 16px; font-size:13px; opacity: 0.5; pointer-events: none;" onclick="confirmSelectedPending()">Confirm Selected (0)</button></div>'
+    +'</div>'
+    +'<p style="font-size:12px;color:#8892b0;margin-bottom:1.5rem"><span style="color:#ff6b6b">■</span> Orange rows = unmatched - please select a category.</p>'
+    +'<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:1.5rem">'
+    +'<div style="display:flex; gap:16px; margin-bottom:1.5rem; align-items:end; flex-wrap:wrap;">'
+    +'  <div class="field" style="width:200px;"><label>Month</label><div style="position:relative"><i class="ph ph-calendar-blank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
+    +'    <select id="pend-month" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 36px;appearance:none;color:var(--text-primary);"><option value="all">All Months</option><option value="01">January</option><option value="02">February</option><option value="03">March</option><option value="04">April</option><option value="05">May</option><option value="06">June</option><option value="07">July</option><option value="08">August</option><option value="09">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select>'
+    +'    <i class="ph ph-caret-down" style="position:absolute;right:12px;top:12px;color:var(--text-secondary);pointer-events:none"></i></div></div>'
+    +'  <div class="field" style="width:200px;"><label>Year</label><div style="position:relative"><i class="ph ph-calendar-blank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
+    +'    <select id="pend-year" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 36px;appearance:none;color:var(--text-primary);">'+ys+'</select>'
+    +'    <i class="ph ph-caret-down" style="position:absolute;right:12px;top:12px;color:var(--text-secondary);pointer-events:none"></i></div></div>'
+    +'  <div class="field" style="width:200px;"><label>Bank Name</label><div style="position:relative"><i class="ph ph-bank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
+    +'    <select id="pend-bank" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 36px;appearance:none;color:var(--text-primary);">'
+    +'      <option value="All">All Banks</option>'
+    +'    </select><i class="ph ph-caret-down" style="position:absolute;right:12px;top:12px;color:var(--text-secondary);pointer-events:none"></i></div></div>'
+    +'  <div style="display:flex;height:42px;"><button class="btn btn-blue-glow" style="padding:0 24px;" onclick="fetchPendingTxns()">Apply Filters</button></div>'
+    +'</div></div>'
+    +'<div class="tbl-wrap"><table class="data-tbl"><thead><tr><th style="width:40px;text-align:center;"><input type="checkbox" id="selectAllPending" onchange="toggleAllPending(this.checked)"></th><th>Date</th><th>Description</th><th>Bank Name</th><th>Type</th><th>Amount</th><th>Category</th><th>Sub-category</th><th>Action</th></tr></thead>'
+    +'<tbody id="confirm-body"></tbody></table></div>'
+    +'</div></div>';
+
+  var z = document.getElementById('zone-unified');
+  var f = document.getElementById('file-unified');
+  if(z && f) {
+    z.onclick = function() { f.click(); };
+    z.ondragover = function(e){ e.preventDefault(); z.style.borderColor = '#64ffda'; };
+    z.ondragleave = function(e){ e.preventDefault(); z.style.borderColor = '#233554'; };
+    z.ondrop = function(e){
+      e.preventDefault();
+      z.style.borderColor = '#233554';
+      if(e.dataTransfer.files && e.dataTransfer.files.length>0) {
+        handleUnifiedFile(e.dataTransfer.files[0]);
+      }
+    };
+    f.onchange = function(e) {
+      if(e.target.files && e.target.files.length>0) {
+        handleUnifiedFile(e.target.files[0]);
+      }
+    };
+  }
+  
+  if(currentUser) {
+    sb.from('transactions').select('bank_name').eq('user_id', currentUser.id).eq('status', 'PENDING').then(function(res) {
+      if(res.data) {
+        var bSel = document.getElementById('pend-bank');
+        if(bSel) {
+          var banks = [...new Set(res.data.filter(function(t){return t.bank_name;}).map(function(t){return t.bank_name;}))].sort();
+          var currentVal = bSel.value;
+          var html = '<option value="All">All Banks</option>';
+          banks.forEach(function(b) { html += '<option value="'+b+'" '+(currentVal===b?'selected':'')+'>'+b+'</option>'; });
+          bSel.innerHTML = html;
+        }
+      }
+    });
+  }
+  
+  fetchPendingTxns();
+};
+
+window.handleUnifiedFile = function(file) {
+  var ext = file.name.split('.').pop().toLowerCase();
+  var bank = document.getElementById('bank-selector').value;
+  setMsg(document.getElementById('upload-msg'), 'info', 'Parsing ' + file.name + '...');
+
+  if(ext === 'csv') {
+    var reader = new FileReader();
+    reader.onload = function(e) { processParsedResult(e.target.result, bank, 'csv'); };
+    reader.readAsText(file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    if(typeof XLSX === 'undefined') { setMsg(document.getElementById('upload-msg'), 'err', 'Excel parser missing.'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var data = new Uint8Array(e.target.result);
+      try {
+        var workbook = XLSX.read(data, {type: 'array'});
+        var csv = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+        processParsedResult(csv, bank, 'excel');
+      } catch (err) {
+        var errStr = (err.message || '').toLowerCase();
+        if(errStr.includes('password') || errStr.includes('encrypt') || errStr.includes('cfb')) {
+          var pwd = prompt("This Excel file is password protected. Please enter the password to decrypt:");
+          if(!pwd) {
+            setMsg(document.getElementById('upload-msg'), 'err', 'Upload cancelled: Password is required.');
+            return;
+          }
+          
+          setMsg(document.getElementById('upload-msg'), 'info', '<i class="ph ph-spinner ph-spin"></i> Decrypting securely at the edge...');
+          
+          // Convert array buffer to base64
+          var binary = '';
+          for (var i = 0; i < data.byteLength; i++) {
+            binary += String.fromCharCode(data[i]);
+          }
+          var base64 = btoa(binary);
+
+          sb.functions.invoke('decrypt-excel', {
+            body: { fileBase64: base64, password: pwd }
+          }).then(function(res) {
+            if(res.error) {
+              setMsg(document.getElementById('upload-msg'), 'err', 'Decryption failed: ' + res.error.message);
+              return;
+            }
+            if(!res.data || res.data.error) {
+              setMsg(document.getElementById('upload-msg'), 'err', 'Decryption failed: ' + (res.data ? res.data.error : 'Incorrect password'));
+              return;
+            }
+            
+            // Decode decrypted base64 back to Uint8Array
+            var decBinary = atob(res.data.decryptedFileBase64);
+            var decData = new Uint8Array(decBinary.length);
+            for(var j=0; j<decBinary.length; j++) {
+              decData[j] = decBinary.charCodeAt(j);
+            }
+            
+            try {
+              var decWb = XLSX.read(decData, {type: 'array'});
+              var decCsv = XLSX.utils.sheet_to_csv(decWb.Sheets[decWb.SheetNames[0]]);
+              setMsg(document.getElementById('upload-msg'), 'info', 'File decrypted successfully! Parsing...');
+              processParsedResult(decCsv, bank, 'excel');
+            } catch(e2) {
+               setMsg(document.getElementById('upload-msg'), 'err', 'Failed to read decrypted file content.');
+            }
+          }).catch(function(funcErr) {
+            setMsg(document.getElementById('upload-msg'), 'err', 'Edge function error: ' + funcErr.message);
+          });
+        } else {
+          setMsg(document.getElementById('upload-msg'), 'err', 'Failed to read Excel file: ' + err.message);
+        }
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    setMsg(document.getElementById('upload-msg'), 'err', 'Unsupported file type: ' + ext);
+  }
+};
+
+window.processParsedResult = function(csvString, bank, type) {
+  var lines = [];
+  var currentLine = '';
+  var inQGlobal = false;
+  for(var i=0; i<csvString.length; i++) {
+    var c = csvString[i];
+    if(c === '"') { inQGlobal = !inQGlobal; }
+    
+    if((c === '\n' || c === '\r') && !inQGlobal) {
+      if (c === '\r' && csvString[i+1] === '\n') i++;
+      lines.push(currentLine);
+      currentLine = '';
+    } else {
+      currentLine += c;
+    }
+  }
+  if(currentLine) lines.push(currentLine);
+
+  var txns = [];
+  var foundHeader = false;
+  var latestDate = '';
+  var latestBal = 0;
+  
+  var sel = document.getElementById('bank-selector');
+  var bankPretty = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : bank;
+
+  for(var i=0; i<lines.length; i++) {
+    var line = lines[i].trim();
+    if(!line) continue;
+    var cols = []; var inQ = false, val = '';
+    for(var j=0; j<line.length; j++) {
+      var c = line[j];
+      if(c === '"') { inQ = !inQ; }
+      else if(c === ',' && !inQ) { cols.push(val.trim()); val = ''; }
+      else { val += c; }
+    }
+    cols.push(val.trim());
+    var lc = line.toLowerCase();
+    if(!foundHeader) {
+      if(bank === 'kotak' && lc.includes('sl') && lc.includes('description')) { foundHeader = true; }
+      else if (bank === 'sbi' && lc.includes('date') && (lc.includes('narration') || lc.includes('description') || lc.includes('particulars') || lc.includes('details'))) { foundHeader = true; }
+      else if (bank === 'hdfc' && lc.includes('date') && lc.includes('narration')) { foundHeader = true; }
+      continue;
+    }
+    if(bank === 'kotak' && cols.length >= 9) {
+      // 0: Sl No, 1: Transaction date, 2: Value Date, 3: Description, 4: Chq/Ref, 5: Amount, 6: Dr/Cr, 7: Balance, 8: Dr/Cr
+      var dateStr = cols[2].trim();
+      var desc = cols[3].trim();
+      var amtStr = cols[5] ? cols[5].replace(/,/g,'') : '0';
+      var amt = parseFloat(amtStr);
+      var typeStr = cols[6] ? cols[6].toUpperCase().trim() : '';
+      
+      var tType = (typeStr === 'CR') ? 'Deposit' : 'Withdrawal';
+      
+      var dateSep = dateStr.includes('-') ? '-' : '/';
+      var dateParts = dateStr.split(dateSep);
+      if(dateParts.length === 3) {
+        var yy = dateParts[2].length === 2 ? '20'+dateParts[2] : dateParts[2];
+        var mm = dateParts[1].padStart(2, '0');
+        var dd = dateParts[0].padStart(2, '0');
+        var date = yy + '-' + mm + '-' + dd;
+        if(amt > 0) txns.push({date: date, desc: desc, amount: amt, type: tType, bank_name: bankPretty});
+      }
+    } else if (bank === 'sbi' && cols.length >= 5) {
+      var dateStr = cols[0] ? cols[0].trim() : '';
+      var desc = cols[1] ? cols[1].trim() : '';
+      // Sometimes Ref No is missing, so we check if Col 2 or 3 is the Debit column by looking at what contains the balance
+      var dr = parseFloat(cols[3] ? cols[3].replace(/,/g,'') : '0');
+      var cr = parseFloat(cols[4] ? cols[4].replace(/,/g,'') : '0');
+      var bal = parseFloat(cols[5] ? cols[5].replace(/,/g,'') : '0');
+      
+      var dateSep = dateStr.includes('/') ? '/' : '-';
+      var dateParts = dateStr.split(dateSep);
+      if(dateParts.length === 3) {
+        var m = MONTHS.indexOf(dateParts[1]);
+        var mStr = m !== -1 ? (m+1).toString().padStart(2, '0') : dateParts[1].padStart(2, '0');
+        var yStr = dateParts[2].length === 2 ? '20'+dateParts[2] : dateParts[2];
+        var parsedDate = yStr+'-'+mStr+'-'+dateParts[0].padStart(2, '0');
+        var amt = dr > 0 ? dr : cr;
+        if(amt > 0) txns.push({date: parsedDate, desc: desc, amount: amt, type: dr>0?'Withdrawal':'Deposit', bank_name: bankPretty});
+        if(bal > 0 && parsedDate > latestDate) { latestDate = parsedDate; latestBal = bal; }
+      }
+    } else if (bank === 'hdfc' && cols.length >= 7) {
+      var dateStr = cols[0] ? cols[0].trim() : '';
+      var desc = cols[1] ? cols[1].trim() : '';
+      var dr = parseFloat(cols[4] ? cols[4].replace(/,/g,'') : '0');
+      var cr = parseFloat(cols[5] ? cols[5].replace(/,/g,'') : '0');
+      var bal = parseFloat(cols[6] ? cols[6].replace(/,/g,'') : '0');
+      
+      var dateSep = dateStr.includes('/') ? '/' : '-';
+      var dateParts = dateStr.split(dateSep);
+      if(dateParts.length >= 3) {
+        var m = MONTHS.indexOf(dateParts[1]);
+        var mStr = m !== -1 ? (m+1).toString().padStart(2, '0') : dateParts[1].padStart(2, '0');
+        var yStr = dateParts[2].length === 2 ? '20'+dateParts[2] : dateParts[2];
+        var parsedDate = yStr+'-'+mStr+'-'+dateParts[0].padStart(2, '0');
+        var amt = dr > 0 ? dr : cr;
+        if(amt > 0) txns.push({date: parsedDate, desc: desc, amount: amt, type: dr>0?'Withdrawal':'Deposit', bank_name: bankPretty});
+        if(bal > 0 && parsedDate > latestDate) { latestDate = parsedDate; latestBal = bal; }
+      }
+    }
+  }
+  if(txns.length > 0) {
+    setMsg(document.getElementById('upload-msg'), 'info', 'Auto-categorizing ' + txns.length + ' txns...');
+    getRules().then(function(rules) {
+      for(var i=0; i<txns.length; i++) {
+        var t = txns[i];
+        for (var j = 0; j < rules.length; j++) {
+          if (rules[j].keyword && typeof fuzzyMatch === 'function' && fuzzyMatch(t.desc, rules[j].keyword)) {
+            var cat = rules[j].category;
+            // Strict Validation
+            if (cat === 'Income' && t.type !== 'Deposit') continue;
+            if (cat === 'Expenses' && t.type !== 'Withdrawal') continue;
+            
+            t.cat = cat;
+            t.subcat = rules[j].subcategory;
+            break;
+          } else if (rules[j].type === t.type && rules[j].keyword && t.desc.toLowerCase().includes(rules[j].keyword.toLowerCase())) {
+            t.cat = rules[j].category;
+            t.subcat = rules[j].subcategory;
+            break;
+          }
+        }
+      }
+      autoCategorizeUpload(txns);
+      if((bank === 'sbi' || bank === 'hdfc') && latestBal > 0) {
+        var d = getMonthYear();
+        var banner = '<div id="bal-banner" style="background:#0c2a1a;border:1px solid #1D9E75;border-radius:8px;padding:.85rem 1rem;margin-top:.75rem;font-size:13px;color:#e8eaf0">'
+          +'<b style="color:#00d4a0">Bank balance detected: '+fmt(latestBal)+'</b><br>'
+          +'<span style="font-size:12px;color:#8892b0">Closing balance for '+MFULL[d.m]+' '+d.y+'. Save to assets?</span><br>'
+          +'<div style="display:flex;gap:8px;margin-top:.6rem">'
+          +'<button class="btn btn-green btn-sm" onclick="saveBankBal('+latestBal+')">Yes, save</button>'
+          +'</div></div>';
+        var msgEl = document.getElementById('upload-msg');
+        if(msgEl) msgEl.insertAdjacentHTML('afterend', banner);
+      }
+    });
+  } else {
+    setMsg(document.getElementById('upload-msg'), 'err', 'No transactions found. Check bank selection.');
+  }
+};
+
+window.autoCategorizeUpload = function(txns) {
+  var batchId = crypto.randomUUID();
+  var toInsert = txns.map(function(t) {
+    return {
+      user_id: currentUser.id, date: t.date, description: t.desc, amount: t.amount, type: t.type,
+      category: t.cat || null, subcategory: t.subcat || null, status: 'PENDING', upload_batch_id: batchId,
+      bank_name: t.bank_name || null
+    };
+  });
+  sb.from('transactions').insert(toInsert).then(function(res) {
+    if(res.error) setMsg(document.getElementById('upload-msg'), 'err', res.error.message);
+    else {
+      setMsg(document.getElementById('upload-msg'), 'ok', 'Uploaded successfully!');
+      document.getElementById('zone-unified').style.display = 'none';
+      fetchPendingTxns();
+    }
+  });
+};
+
+window.fetchPendingTxns = function() {
+  if(!currentUser) return;
+  
+  var mSel = document.getElementById('pend-month'); 
+  var ySel = document.getElementById('pend-year');
+  var bSel = document.getElementById('pend-bank');
+  var q = sb.from('transactions').select('*').eq('user_id', currentUser.id).eq('status', 'PENDING');
+  
+  if (bSel && bSel.value !== 'All') {
+    q = q.eq('bank_name', bSel.value);
+  }
+  
+  if (mSel && ySel) {
+    var mm = mSel.value; var yy = ySel.value;
+    if (yy !== 'all') {
+      if(mm !== 'all') {
+        var nextM = parseInt(mm)+1; var nextY = parseInt(yy); if(nextM>12){ nextM=1; nextY++; }
+        q = q.gte('date', yy+'-'+mm+'-01').lt('date', nextY+'-'+nextM.toString().padStart(2,'0')+'-01');
+      } else { 
+        q = q.gte('date', yy+'-01-01').lte('date', yy+'-12-31'); 
+      }
+    }
+  }
+
+  q.order('date', {ascending: false}).then(function(res) {
+    if(res.error) { console.error(res.error); return; }
+    window.pendingTxns = res.data || [];
+    showConfirm(window.pendingTxns);
+  });
+};
+
+window.confirmSelectedPending = function() {
+  var cbs = document.querySelectorAll('.pending-cb:checked');
+  if(cbs.length === 0) return;
+  
+  var selectedIds = [];
+  for(var i=0; i<cbs.length; i++) selectedIds.push(cbs[i].value);
+  
+  var selectedTxns = (window.pendingTxns || []).filter(function(t) { return selectedIds.includes(t.id); });
+  var uncat = selectedTxns.find(function(t){ return !t.category || t.category === '' || !t.subcategory || t.subcategory === ''; });
+  
+  if(uncat) { 
+    alert('One or more selected transactions are missing a Category/Subcategory. Please fix them or uncheck them before confirming.'); 
+    return; 
+  }
+  
+  var btn = document.getElementById('btn-confirm-all');
+  var origText = btn ? btn.innerText : '';
+  if(btn) { btn.innerText = 'Confirming...'; btn.disabled = true; }
+  
+  sb.from('transactions').update({status: 'CONFIRMED'}).in('id', selectedIds).then(function(res) {
+    if(btn) { btn.innerText = origText; btn.disabled = false; }
+    if(res.error) { alert('Error: ' + res.error.message); }
+    else { 
+       var selectAll = document.getElementById('selectAllPending');
+       if (selectAll) selectAll.checked = false;
+       toggleBulkDeleteBtn();
+       fetchPendingTxns(); 
+    }
+  });
+};
+
+var origUpdCat = window.updCat;
+window.updCat = function(idx, val) {
+  if(window.pendingTxns && window.pendingTxns[idx]) {
+    window.pendingTxns[idx].category = val; window.pendingTxns[idx].subcategory = '';
+    sb.from('transactions').update({category: val, subcategory: null}).eq('id', window.pendingTxns[idx].id).then(function(){ showConfirm(window.pendingTxns); });
+  } else if(origUpdCat) origUpdCat(idx, val);
+};
+
+var origUpdSubCat = window.updSubCat;
+window.updSubCat = function(idx, val) {
+  if(window.pendingTxns && window.pendingTxns[idx]) {
+    window.pendingTxns[idx].subcategory = val;
+    sb.from('transactions').update({subcategory: val}).eq('id', window.pendingTxns[idx].id).then(function(){ showConfirm(window.pendingTxns); });
+  } else if(origUpdSubCat) origUpdSubCat(idx, val);
+};
+
+window.showConfirm = function(arr) {
+  var sec = document.getElementById('confirm-sec'); var bdy = document.getElementById('confirm-body');
+  if(!sec || !bdy) return;
+  sec.style.display = 'block'; document.getElementById('txn-count').innerText = '(' + arr.length + ')';
+  
+  var html = '';
+  var ddStyle = 'width:100%;min-width:140px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text-primary);cursor:pointer;font-size:13px;outline:none;';
+  
+  for(var i=0; i<arr.length; i++) {
+    var t = arr[i]; var bg = (!t.category) ? 'rgba(255,107,107,0.15)' : 'transparent';
+    var catOpt = '<option value="">Select</option>';
+    if (typeof CAT_MAP !== 'undefined') {
+      for(var k in CAT_MAP) catOpt += '<option '+(t.category===k?'selected':'')+'>'+k+'</option>';
+    }
+    var subOpt = getSubcatOptionsHTML(t.category, t.subcategory);
+    var dParts = t.date.split('-');
+    var displayDate = dParts.length === 3 ? (dParts[2] + '-' + dParts[1] + '-' + dParts[0]) : t.date;
+    html += '<tr style="background:'+bg+'"><td style="text-align:center;"><input type="checkbox" class="pending-cb" value="'+t.id+'" onchange="toggleBulkDeleteBtn()"></td><td style="white-space:nowrap;">'+displayDate+'</td><td class="desc-cell" title="'+(t.description||t.desc)+'">'+(t.description||t.desc)+'</td>'
+      +'<td><span class="badge" style="background:var(--bg-card2);color:var(--text-primary);border:1px solid var(--border);font-size:11px;padding:2px 6px;white-space:nowrap">'+(t.bank_name || '-')+'</span></td>'
+      +'<td><span class="badge '+(t.type==='Withdrawal'?'b-wit':'b-dep')+'">'+t.type+'</span></td>'
+      +'<td style="font-weight:600">'+fmt(t.amount)+'</td>'
+      +'<td><select style="'+ddStyle+'" onchange="updCat('+i+', this.value)">'+catOpt+'</select></td>'
+      +'<td><select style="'+ddStyle+'" onchange="handleSubcatChange(this, pendingTxns['+i+'].category, function(v){updSubCat('+i+', v)})">'+subOpt+'</select></td>'
+      +'<td><button class="action-btn" style="background:transparent; border:none; cursor:pointer; color:var(--text-secondary); padding:4px;" onclick="openActionMenu(event, null, null, null, '+i+')"><i class="ph ph-dots-three-vertical" style="font-size:20px;"></i></button></td></tr>';
+  }
+  bdy.innerHTML = html;
+};
+
+var originalFetchDashboardTxns = window.fetchDashboardTxns;
+window.fetchDashboardTxns = function() {
+  if(!currentUser) return;
+  var mSel = document.getElementById('dash-month'); var ySel = document.getElementById('dash-year');
+  if(!mSel || !ySel) return;
+  var mm = mSel.value; var yy = ySel.value;
+  var q = sb.from('transactions').select('*').eq('user_id', currentUser.id).eq('status', 'CONFIRMED');
+  if(mm !== 'all') {
+    var nextM = parseInt(mm)+1; var nextY = parseInt(yy); if(nextM>12){ nextM=1; nextY++; }
+    q = q.gte('date', yy+'-'+mm+'-01').lt('date', nextY+'-'+nextM.toString().padStart(2,'0')+'-01');
+  } else { q = q.gte('date', yy+'-01-01').lte('date', yy+'-12-31'); }
+  q.order('date', {ascending:false}).then(function(res) {
+    if(!res.error) { window.dashboardTxns = res.data || []; if(typeof renderDashboardTables === 'function') renderDashboardTables(); if(typeof renderCharts === 'function') renderCharts(); }
+  });
+};
+window.toggleAllPending = function(checked) {
+  var cbs = document.querySelectorAll('.pending-cb');
+  for(var i=0; i<cbs.length; i++) cbs[i].checked = checked;
+  toggleBulkDeleteBtn();
+};
+window.toggleBulkDeleteBtn = function() {
+  var cbs = document.querySelectorAll('.pending-cb:checked');
+  
+  var delBtn = document.getElementById('btn-del-selected');
+  if(delBtn) delBtn.style.display = cbs.length > 0 ? 'inline-block' : 'none';
+  
+  var confBtn = document.getElementById('btn-confirm-all');
+  if(confBtn) {
+    if(cbs.length > 0) {
+      confBtn.innerText = 'Confirm Selected (' + cbs.length + ')';
+      confBtn.style.opacity = '1';
+      confBtn.style.pointerEvents = 'auto';
+    } else {
+      confBtn.innerText = 'Confirm Selected (0)';
+      confBtn.style.opacity = '0.5';
+      confBtn.style.pointerEvents = 'none';
+    }
+  }
+  
+  var selectAll = document.getElementById('selectAllPending');
+  var totalCbs = document.querySelectorAll('.pending-cb');
+  if(selectAll && totalCbs.length > 0) {
+    selectAll.checked = cbs.length === totalCbs.length;
+  }
+};
+window.deleteSelectedPending = function() {
+  var cbs = document.querySelectorAll('.pending-cb:checked');
+  if(cbs.length === 0) return;
+  if(!confirm('Are you sure you want to delete ' + cbs.length + ' transactions?')) return;
+  
+  var ids = [];
+  for(var i=0; i<cbs.length; i++) ids.push(cbs[i].value);
+  
+  var btn = document.getElementById('btn-del-selected');
+  var origText = btn.innerText;
+  btn.innerText = 'Deleting...'; btn.disabled = true;
+  
+  sb.from('transactions').delete().in('id', ids).then(function(res) {
+    btn.innerText = origText; btn.disabled = false;
+    if(res.error) { alert('Delete failed: ' + res.error.message); }
+    else { 
+       var selectAll = document.getElementById('selectAllPending');
+       if (selectAll) selectAll.checked = false;
+       toggleBulkDeleteBtn();
+       fetchPendingTxns(); 
+    }
+  });
+};
+
+window.toggleAllDash = function(checked) {
+  var cbs = document.querySelectorAll('.dash-cb');
+  for(var i=0; i<cbs.length; i++) cbs[i].checked = checked;
+  checkDashActions();
+};
+
+window.checkDashActions = function() {
+  var checked = document.querySelectorAll('.dash-cb:checked').length;
+  var btn = document.getElementById('btn-delete-dash');
+  if(btn) {
+    btn.style.opacity = checked > 0 ? '1' : '0.5';
+    btn.style.pointerEvents = checked > 0 ? 'auto' : 'none';
+    btn.innerText = 'Delete Selected (' + checked + ')';
+  }
+};
+
+window.deleteSelectedDash = function() {
+  var cbs = document.querySelectorAll('.dash-cb:checked');
+  if(cbs.length === 0) return;
+  if(!confirm('Are you sure you want to delete ' + cbs.length + ' transactions?')) return;
+  
+  var ids = [];
+  for(var i=0; i<cbs.length; i++) ids.push(cbs[i].value);
+  
+  var btn = document.getElementById('btn-delete-dash');
+  var origText = btn.innerText;
+  btn.innerText = 'Deleting...'; btn.disabled = true;
+  
+  sb.from('transactions').delete().in('id', ids).then(function(res) {
+    btn.innerText = origText; btn.disabled = false;
+    if(res.error) { alert('Delete failed: ' + res.error.message); }
+    else { 
+       var selectAll = document.getElementById('selectAllDash');
+       if (selectAll) selectAll.checked = false;
+       checkDashActions();
+       renderTxn(); 
+    }
+  });
+};
+
+window.openDashActionMenu = function(e, txnId, groupId) {
+  if(e) e.stopPropagation();
+  var menu = document.getElementById('global-action-menu');
+  if(!menu) {
+    menu = document.createElement('div');
+    menu.id = 'global-action-menu';
+    menu.className = 'action-menu';
+    menu.innerHTML = '<div id="action-menu-content"></div>';
+    document.body.appendChild(menu);
+  }
+  var content = document.getElementById('action-menu-content');
+  var html = '';
+  
+  if (groupId) {
+    html += '<div class="action-menu-item" onclick="editSplitGroup(\''+groupId+'\')"><i class="ph ph-pencil-simple"></i> Edit Split Group</div>';
+    html += '<div class="action-menu-item danger" onclick="deleteSplitGroup(\''+groupId+'\')"><i class="ph ph-trash"></i> Delete Split Group</div>';
+  } else {
+    var amt = 0;
+    var t = window.dashboardTxns ? window.dashboardTxns.find(function(x) { return x.id === txnId; }) : null;
+    if (t) amt = t.amount;
+    
+    html += '<div class="action-menu-item" onclick="openEditTxnModal(\''+txnId+'\')"><i class="ph ph-pencil-simple"></i> Edit</div>';
+    html += '<div class="action-menu-item" onclick="openSplitModal(\''+txnId+'\', '+amt+')"><i class="ph ph-git-branch"></i> Split Transaction</div>';
+    html += '<div class="action-menu-item danger" onclick="deleteTxn(\''+txnId+'\')"><i class="ph ph-trash"></i> Delete</div>';
+  }
+  
+  content.innerHTML = html;
+  menu.style.display = 'block';
+  menu.classList.remove('hide');
+  
+  var targetEl = e.target.closest('button') || e.target.closest('div') || e.target;
+  var rect = targetEl.getBoundingClientRect();
+  menu.style.top = (rect.bottom + window.scrollY) + 'px';
+  menu.style.left = (rect.right + window.scrollX - 140) + 'px';
+};
+
+window.currentEditTxnId = null;
+
+window.closeEditModal = function() {
+  document.getElementById('modal-edit').classList.add('hide');
+};
+
+window.openEditTxnModal = function(txnId) {
+  window.currentEditTxnId = txnId;
+  var t = window.dashboardTxns.find(function(x) { return x.id === txnId; });
+  if(!t) return;
+  
+  document.getElementById('edit-amount').value = t.amount;
+  
+  var catEl = document.getElementById('edit-cat');
+  var subcatEl = document.getElementById('edit-subcat');
+  
+  catEl.innerHTML = '<option value="">Select category</option>' + Object.keys(CAT_MAP).map(function(c) {
+    return '<option '+(t.category===c?'selected':'')+'>'+c+'</option>';
+  }).join('');
+  
+  window.updateEditSubcat = function() {
+    var c = catEl.value;
+    subcatEl.innerHTML = getSubcatOptionsHTML(c, t.subcategory);
+    subcatEl.onchange = function() {
+      handleSubcatChange(subcatEl, c);
+    };
+  };
+  
+  updateEditSubcat();
+  
+  document.getElementById('modal-edit').classList.remove('hide');
+  document.getElementById('msg-edit').innerHTML = '';
+};
+
+window.saveEditTxn = function() {
+  var amt = parseFloat(document.getElementById('edit-amount').value);
+  var cat = document.getElementById('edit-cat').value;
+  var sub = document.getElementById('edit-subcat').value;
+  
+  if(!cat || !sub || isNaN(amt)) {
+    document.getElementById('msg-edit').innerHTML = '<span style="color:var(--red)">Please fill all fields</span>';
+    return;
+  }
+  
+  var btn = document.getElementById('btn-save-edit');
+  var orig = btn.innerText;
+  btn.innerText = 'Saving...'; btn.disabled = true;
+  
+  sb.from('transactions').update({
+    amount: amt,
+    category: cat,
+    subcategory: sub
+  }).eq('id', window.currentEditTxnId).then(function(res) {
+    btn.innerText = orig; btn.disabled = false;
+    if(res.error) {
+      document.getElementById('msg-edit').innerHTML = '<span style="color:var(--red)">Error saving</span>';
+    } else {
+      closeEditModal();
+      renderTxn();
+    }
+  });
+};
+// --- SUBCATEGORIES MANAGEMENT ---
+var currentSubcatSelectTarget = null;
+var currentSubcatCategory = null;
+
+function loadCustomSubcategories(callback) {
+  sb.from('subcategories').select('*').then(function(res) {
+    if (!res.error && res.data) {
+      // Rebuild CAT_MAP dynamically
+      CAT_MAP = { 'Income': [], 'Expenses': [], 'Assets': [], 'Liabilities': [] };
+      // Map DB names to App names
+      var nameMap = { 'Expense': 'Expenses', 'Asset': 'Assets', 'Liability': 'Liabilities', 'Income': 'Income' };
+      
+      // First, ensure all mapped categories exist
+      for (var dbCat in nameMap) {
+        if (!CAT_MAP[nameMap[dbCat]]) CAT_MAP[nameMap[dbCat]] = [];
+      }
+      
+      res.data.forEach(function(row) {
+        var cat = nameMap[row.category] || row.category;
+        if (!CAT_MAP[cat]) CAT_MAP[cat] = [];
+        CAT_MAP[cat].push(row.subcategory_name);
+      });
+    }
+    if (callback) callback();
+  });
+}
+
+function getSubcatOptionsHTML(cat, selectedVal) {
+  var html = '<option value="">Select sub-category</option>';
+  if (cat && CAT_MAP[cat]) {
+    html += CAT_MAP[cat].map(function(s) {
+      return '<option value="' + s + '" ' + (selectedVal === s ? 'selected' : '') + '>' + s + '</option>';
+    }).join('');
+    html += '<option disabled>----------</option>';
+    html += '<option value="__ADD_NEW__">+ Add New Subcategory</option>';
+  }
+  return html;
+}
+
+function handleSubcatChange(sel, cat, callback) {
+  if (sel.value === '__ADD_NEW__') {
+    sel.value = ''; // Reset temporarily
+    openAddSubcatModal(cat, sel, callback);
+  } else if (callback) {
+    callback(sel.value);
+  }
+}
+
+function openAddSubcatModal(cat, selectElement, callback) {
+  currentSubcatSelectTarget = selectElement;
+  currentSubcatCategory = cat;
+  
+  // Convert App category name back to DB name for display
+  var reverseMap = { 'Expenses': 'Expense', 'Assets': 'Asset', 'Liabilities': 'Liability', 'Income': 'Income' };
+  document.getElementById('add-subcat-cat').value = reverseMap[cat] || cat;
+  document.getElementById('add-subcat-name').value = '';
+  document.getElementById('add-subcat-msg').innerText = '';
+  document.getElementById('modal-add-subcat').classList.remove('hide');
+}
+
+function closeAddSubcatModal() {
+  document.getElementById('modal-add-subcat').classList.add('hide');
+  currentSubcatSelectTarget = null;
+  currentSubcatCategory = null;
+}
+
+function saveCustomSubcat() {
+  var name = document.getElementById('add-subcat-name').value.trim();
+  var msg = document.getElementById('add-subcat-msg');
+  var cat = document.getElementById('add-subcat-cat').value;
+  var appCat = currentSubcatCategory;
+  
+  if (!name) {
+    msg.innerText = 'Subcategory name cannot be blank.';
+    return;
+  }
+  
+  // Check duplicates locally
+  if (CAT_MAP[appCat] && CAT_MAP[appCat].includes(name)) {
+    msg.innerText = 'This subcategory already exists.';
+    return;
+  }
+  
+  var btn = document.getElementById('btn-save-subcat');
+  var orig = btn.innerText;
+  btn.innerText = 'Saving...';
+  btn.disabled = true;
+  
+  sb.from('subcategories').insert({
+    user_id: currentUser.id,
+    category: cat,
+    subcategory_name: name,
+    is_default: false
+  }).then(function(res) {
+    btn.innerText = orig;
+    btn.disabled = false;
+    
+    if (res.error) {
+      msg.innerText = 'Error: ' + res.error.message;
+    } else {
+      // Add to local state
+      CAT_MAP[appCat].push(name);
+      
+      // Update the target dropdown
+      if (currentSubcatSelectTarget) {
+        currentSubcatSelectTarget.innerHTML = getSubcatOptionsHTML(appCat, name);
+        // Trigger any original onchange logic if it wasn't intercepted
+        var evt = new Event('change', { bubbles: true });
+        currentSubcatSelectTarget.dispatchEvent(evt);
+      }
+      
+      closeAddSubcatModal();
+    }
+  });
 }
