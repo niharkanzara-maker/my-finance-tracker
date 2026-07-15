@@ -4,13 +4,13 @@ const guideData = [
     title: "Welcome",
     icon: "ph-house",
     content: `
-      <h1 style="font-size: 32px; color: var(--text-primary); margin-bottom: 24px;">Welcome to Finance Tracker</h1>
-      <p style="font-size: 16px; color: var(--text-secondary); max-width: 700px; margin-bottom: 32px; line-height: 1.6;">Welcome to Finance Tracker — your personal financial management platform designed to help you organize your money, monitor your financial progress, and make informed financial decisions with confidence.</p>
+      <h1 style="font-size: 32px; color: var(--text-primary); margin-bottom: 24px;">Welcome to The FinTracker</h1>
+      <p style="font-size: 16px; color: var(--text-secondary); max-width: 700px; margin-bottom: 32px; line-height: 1.6;">Welcome to The FinTracker — your personal financial management platform designed to help you organize your money, monitor your financial progress, and make informed financial decisions with confidence.</p>
       
       <div class="info-card" style="max-width: 700px; margin-bottom: 48px;">
         <h3 style="margin-top: 0; margin-bottom: 12px; color: var(--text-primary); font-size: 18px;">What You'll Learn</h3>
         <ul class="styled-list">
-          <li><i class="ph ph-check-circle"></i> Configure your Finance Tracker account</li>
+          <li><i class="ph ph-check-circle"></i> Configure your The FinTracker account</li>
           <li><i class="ph ph-check-circle"></i> Create Categorization Rules</li>
           <li><i class="ph ph-check-circle"></i> Upload Bank Statements</li>
           <li><i class="ph ph-check-circle"></i> Review and Confirm Transactions</li>
@@ -21,8 +21,8 @@ const guideData = [
       <div class="guide-grid">
         <div class="feature-card">
           <div class="feat-icon"><i class="ph ph-target"></i></div>
-          <h3>What Finance Tracker helps you achieve</h3>
-          <p>Whether you manage one bank account or multiple bank accounts, Finance Tracker brings all your financial information together in one place, making it easier to understand your income, expenses, assets, liabilities, and overall financial position.</p>
+          <h3>What The FinTracker helps you achieve</h3>
+          <p>Whether you manage one bank account or multiple bank accounts, The FinTracker brings all your financial information together in one place, making it easier to understand your income, expenses, assets, liabilities, and overall financial position.</p>
           <ul class="styled-list">
             <li><i class="ph ph-check-circle"></i> Organize all your financial transactions in one place.</li>
             <li><i class="ph ph-check-circle"></i> Track your monthly income and expenses.</li>
@@ -36,7 +36,7 @@ const guideData = [
         <div class="feature-card">
           <div class="feat-icon"><i class="ph ph-users"></i></div>
           <h3>Who is it designed for?</h3>
-          <p>Finance Tracker is suitable for anyone who wants better control over personal finances. No financial expertise is required.</p>
+          <p>The FinTracker is suitable for anyone who wants better control over personal finances. No financial expertise is required.</p>
           <ul class="styled-list">
             <li><i class="ph ph-check-circle"></i> Students</li>
             <li><i class="ph ph-check-circle"></i> Working Professionals</li>
@@ -57,7 +57,7 @@ const guideData = [
     icon: "ph-rocket",
     content: `
       <h1 style="font-size: 32px; color: var(--text-primary); margin-bottom: 24px;">Getting Started</h1>
-      <p style="font-size: 16px; color: var(--text-secondary); max-width: 700px; margin-bottom: 48px; line-height: 1.6;">Follow these sequential steps to configure your Finance Tracker and begin monitoring your financial health.</p>
+      <p style="font-size: 16px; color: var(--text-secondary); max-width: 700px; margin-bottom: 48px; line-height: 1.6;">Follow these sequential steps to configure your The FinTracker and begin monitoring your financial health.</p>
 
       <div class="guide-grid">
       <div class="step-card">
@@ -80,7 +80,7 @@ const guideData = [
         <div class="step-content">
           <div class="step-number">Step 02</div>
           <h3>Configure Categorization Rules <span style="font-size: 12px; font-weight: normal; color: var(--text-secondary);">(Recommended First Step)</span></h3>
-          <p>Before uploading your first bank statement, configure your Categorization Rules. Categorization Rules allow Finance Tracker to automatically classify recurring transactions while importing bank statements.</p>
+          <p>Before uploading your first bank statement, configure your Categorization Rules. Categorization Rules allow The FinTracker to automatically classify recurring transactions while importing bank statements.</p>
           <div class="info-card" style="margin-top: 16px;">
             <strong>Examples of keywords:</strong>
             <p>SWIGGY, AMAZON, ZOMATO, UBER</p>
@@ -182,7 +182,7 @@ const guideData = [
         <div class="feature-card">
           <div class="feat-icon"><i class="ph ph-file-csv"></i></div>
           <h3>Upload Statement</h3>
-          <p><strong>What is it?</strong> A module to import your bank statements directly into Finance Tracker.</p>
+          <p><strong>What is it?</strong> A module to import your bank statements directly into The FinTracker.</p>
           <p><strong>Why is it useful?</strong> It automates data entry and uses your Categorization Rules to instantly classify hundreds of transactions.</p>
           <p><strong>How to use it?</strong> Navigate to <em>Financial Records → Upload Statement</em>, choose your bank, and upload the CSV or Excel file.</p>
           <div class="tip-box"><i class="ph ph-lightbulb"></i> Always review pending transactions carefully before confirming them.</div>
@@ -215,7 +215,7 @@ const guideData = [
         <div class="info-card" style="margin-top: 16px;">
           <strong>Example:</strong>
           <p>Keyword: <strong>SWIGGY</strong> &nbsp;|&nbsp; Category: <strong>Expense</strong> &nbsp;|&nbsp; Subcategory: <strong>Food & Dining</strong></p>
-          <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;">Whenever the uploaded statement contains "SWIGGY", Finance Tracker automatically categorizes it.</p>
+          <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;">Whenever the uploaded statement contains "SWIGGY", The FinTracker automatically categorizes it.</p>
         </div>
       </div>
 
@@ -240,13 +240,13 @@ const guideData = [
     icon: "ph-question",
     content: `
       <h1 style="font-size: 32px; color: var(--text-primary); margin-bottom: 24px;">Frequently Asked Questions</h1>
-      <p style="font-size: 16px; color: var(--text-secondary); max-width: 700px; margin-bottom: 48px; line-height: 1.6;">Find answers to the most common questions about the Finance Tracker platform.</p>
+      <p style="font-size: 16px; color: var(--text-secondary); max-width: 700px; margin-bottom: 48px; line-height: 1.6;">Find answers to the most common questions about the The FinTracker platform.</p>
       
       <div class="faq-list">
         <details class="faq-accordion">
           <summary><i class="ph ph-bank"></i> Which bank statements are supported? <i class="ph ph-caret-down acc-arrow"></i></summary>
           <div class="acc-content">
-            <p>Finance Tracker currently supports direct uploads for Kotak Mahindra Bank, State Bank of India (SBI), and HDFC Bank statements in CSV or Excel formats.</p>
+            <p>The FinTracker currently supports direct uploads for Kotak Mahindra Bank, State Bank of India (SBI), and HDFC Bank statements in CSV or Excel formats.</p>
           </div>
         </details>
 
@@ -300,7 +300,7 @@ const guideData = [
           <div class="ts-icon"><i class="ph ph-lock-key"></i></div>
           <div class="ts-content">
             <h3>Password protected Excel</h3>
-            <p>Finance Tracker cannot read password-protected files. Open the statement in Excel, remove the password protection, save the file, and then upload it.</p>
+            <p>The FinTracker cannot read password-protected files. Open the statement in Excel, remove the password protection, save the file, and then upload it.</p>
           </div>
         </div>
 
@@ -340,7 +340,7 @@ function openGuide() {
   var lm = document.getElementById('landing-main'); if(lm) lm.style.display = 'block';
   
   window.scrollTo(0, 0);
-  document.title = "Finance Tracker – User Guide";
+  document.title = "The FinTracker – User Guide";
   
   if (!document.getElementById('guide-rendered')) {
     renderGuide();
@@ -349,7 +349,7 @@ function openGuide() {
 
 function closeGuide() {
   document.getElementById('pg-guide').classList.add('hide');
-  document.title = "Finance Tracker";
+  document.title = "The FinTracker";
   
   if(window.currentUser) {
     var dash = document.getElementById('pg-dash'); if(dash) dash.classList.remove('hide');
@@ -408,3 +408,5 @@ function renderGuide() {
     });
   });
 }
+
+

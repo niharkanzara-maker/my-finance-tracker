@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My Finance Tracker</title>
+<title>The FinTracker</title>
 <link rel="stylesheet" href="style.css?v=2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -20,7 +20,7 @@
 <div id="pg-home">
   <div class="landing-container">
     <header class="landing-header">
-      <div class="landing-logo"><i class="ph ph-bank"></i> Finance Tracker</div>
+      <div class="landing-logo"><i class="ph ph-bank"></i> The FinTracker</div>
       <div class="landing-nav">
       </div>
       <div class="landing-actions">
@@ -41,18 +41,15 @@
            </div>
          </div>
          <div class="hero-visual">
-           <div class="mock-card">
+           <div class="mock-card" style="position: relative;">
+             <div style="position: absolute; top: -14px; right: 24px; background: rgba(59, 130, 246, 0.7); color: rgba(255, 255, 255, 0.95); padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1);">Demo Preview</div>
              <div class="mock-header">
                <div class="mock-label">Total Net Worth</div>
-               <div class="mock-value">₹1,24,85,000.00</div>
-               <div class="mock-trend"><i class="ph ph-trend-up"></i> +12.4% this month</div>
+               <div class="mock-value">₹24,85,000.00</div>
+               <div class="mock-trend"><i class="ph ph-trend-up"></i> +12.4% This Year</div>
              </div>
-             <div class="mock-chart">
+             <div class="mock-chart" style="height: 180px; margin-bottom: 0; border-bottom: none;">
                <div class="mbar" style="height:40%"></div><div class="mbar" style="height:50%"></div><div class="mbar" style="height:30%"></div><div class="mbar" style="height:70%"></div><div class="mbar" style="height:60%"></div><div class="mbar" style="height:90%"></div><div class="mbar" style="height:80%"></div>
-             </div>
-             <div class="mock-assets">
-               <div class="mock-asset"><div class="ma-left"><div class="ma-icon bg-blue"><i class="ph ph-chart-line-up"></i></div><span>Mutual Funds</span></div><span class="mock-amt">₹42,50,000</span></div>
-               <div class="mock-asset"><div class="ma-left"><div class="ma-icon bg-orange"><i class="ph ph-bank"></i></div><span>Fixed Deposits</span></div><span class="mock-amt">₹25,00,000</span></div>
              </div>
            </div>
          </div>
@@ -97,14 +94,14 @@
     <!-- AUTH OVERLAYS -->
     <div id="auth-overlay" class="hide">
       <div class="auth-nav">
-        <div class="landing-logo" onclick="showPanel('none')" style="cursor:pointer"><i class="ph ph-bank"></i> Finance Tracker</div>
+        <div class="landing-logo" onclick="showPanel('none')" style="cursor:pointer"><i class="ph ph-bank"></i> The FinTracker</div>
         <div class="auth-trust">Identity Secured <i class="ph ph-shield-check text-green"></i></div>
       </div>
       <div class="auth-container">
         
         <!-- SIGNUP PANEL -->
         <div id="panel-signup" class="auth-panel hide">
-          <h3>Finance Tracker</h3>
+          <h3>The FinTracker</h3>
           <p class="auth-sub">Elevating your personal finance experience.</p>
           <div class="auth-form">
             <div class="field"><label>FULL NAME</label><input type="text" id="inp-signup-name" placeholder="Alexander Hamilton"></div>
@@ -177,7 +174,8 @@
 <div id="pg-dash" class="hide dash-container">
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <h2>Finance<br>Tracker</h2>
+      <div class="brand-prefix">THE</div>
+      <h2>FinTracker</h2>
       <p>WEALTH MANAGEMENT</p>
     </div>
     
@@ -243,7 +241,7 @@
 <div id="pg-guide" class="hide guide-container">
   <div class="topbar" style="position: relative; justify-content: center;">
     <button class="btn btn-outline" style="position: absolute; left: 32px;" onclick="closeGuide()"><i class="ph ph-arrow-left"></i> Back</button>
-    <h2 style="margin: 0; text-align: center;">Financial Tracker User Guide</h2>
+    <h2 style="margin: 0; text-align: center;">The FinTracker User Guide</h2>
   </div>
   <div class="guide-layout">
     <div class="guide-sidebar">
@@ -252,6 +250,8 @@
     <div class="guide-content" id="guide-content-area"></div>
   </div>
 </div>
+
+
 
 <!-- DEMO -->
 <div id="pg-demo" class="hide">

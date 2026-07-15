@@ -57,8 +57,12 @@ function setMsg(el, type, text) {
 }
 
 function showPage(id) {
-  ['pg-home','pg-dash','pg-demo'].forEach(function(p) { $(p).classList.add('hide'); });
-  $(id).classList.remove('hide');
+  ['pg-home','pg-dash','pg-demo','pg-guide'].forEach(function(p) { 
+    var el = $(p);
+    if (el) el.classList.add('hide'); 
+  });
+  var target = $(id);
+  if (target) target.classList.remove('hide');
 }
 
 function clearCharts() {
@@ -268,11 +272,36 @@ function generateUniqueId() {
 
 function enterDash() {
   $('dash-badge').innerHTML = '<b>'+currentProfile.name+'</b> &nbsp;'+currentProfile.unique_id;
-  if ($('sb-pname')) $('sb-pname').textContent = currentProfile.name;
-  if ($('sb-ptier')) $('sb-ptier').textContent = currentProfile.unique_id;
-  showPage('pg-dash');
-  switchTab('txn');
+  getAllTxns().then(function(allTxns) {
+    var dashboardTxns = [];
+    if (allTxns) {
+      dashboardTxns = allTxns;
+    }
+    if ($('sb-pname')) $('sb-pname').textContent = currentProfile.name;
+    if ($('sb-ptier')) $('sb-ptier').textContent = currentProfile.unique_id;
+    
+    showPage('pg-dash');
+    switchTab('networth');
+  });
 }
+
+// ── ONBOARDING BUTTON NAVIGATION ──
+window.onboardingStep1 = function() {
+  showPage('pg-dash');
+  switchTab('rules');
+};
+window.onboardingStep2 = function() {
+  showPage('pg-dash');
+  switchTab('upload');
+};
+window.onboardingStep3 = function() {
+  showPage('pg-dash');
+  switchTab('upload');
+};
+window.onboardingStep4 = function() {
+  showPage('pg-dash');
+  switchTab('upload');
+};
 
 // ── SEARCH ──
 var globalSearchTerm = '';
@@ -347,6 +376,12 @@ function getTxns() {
 function getAllTxns() {
   return sb.from('transactions').select('*')
     .eq('user_id',currentUser.id).order('date',{ascending:true})
+    .then(function(r){ 
+      return (r.data||[]).filter(function(t) { return t.status !== 'PENDING'; });
+    });
+}
+function getPendingTxns() {
+  return sb.from('transactions').select('*').eq('user_id',currentUser.id).eq('status','PENDING')
     .then(function(r){ return r.data||[]; });
 }
 function getMonthlySnapshots() {
@@ -379,7 +414,11 @@ function saveRulesToDB(rules) {
 
 // ── UNIFIED AGGREGATION ──
 function getUnifiedMonthlyData(txns, snaps, m, y) {
-  var mTxns = txns.filter(function(t) { return t.month === m && t.year === y; });
+  var mTxns = txns.filter(function(t) { 
+    if (t.month !== undefined && t.year !== undefined) return t.month === m && t.year === y;
+    var d = getMonthYearFromDate(t.date);
+    return d.m === m && d.y === y;
+  });
   if (mTxns.length > 0) {
     var inc=0, exp=0, invM=0, invR=0, loanT=0, loanR=0;
     mTxns.forEach(function(t) {
@@ -919,9 +958,125 @@ var nwChartPeriod = '1Y';
 
 // ── TAB 3: NET WORTH ──
 function renderNetWorth() {
-  showLoading('Loading net worth…');
-  Promise.all([getOpeningBalances(), getAllTxns(), getAllSnapshots()]).then(function(results) {
-    var ob=results[0], at=results[1], as=results[2];
+  showLoading('Loading net worth...');
+  Promise.all([getOpeningBalances(), getAllTxns(), getAllSnapshots(), getRules(), getPendingTxns()]).then(function(results) {
+    var ob=results[0], at=results[1], as=results[2], rules=results[3]||[], pending=results[4]||[];
+    
+    if (at && at.length === 0) {
+      var step1Completed = rules.length > 0;
+      var step2Completed = pending.length > 0;
+      
+      var step1HTML = step1Completed ? `
+          <div class="step-card" style="cursor: pointer; border-left: 4px solid #10b981; background: var(--bg-card); transition: all 0.2s;" onclick="onboardingStep1()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div class="step-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;"><i class="ph ph-check-circle"></i></div>
+            <div class="step-content">
+              <div class="step-number" style="color: #10b981; font-weight: 600;">Step 1 Completed</div>
+              <h3 style="margin: 4px 0 8px 0;">Configure Rules</h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">You have successfully configured categorization rules.</p>
+              <button class="btn btn-outline" style="margin-top: 16px; width: fit-content; border-color: #10b981; color: #10b981;">Edit Rules</button>
+            </div>
+          </div>
+      ` : `
+          <div class="step-card" style="cursor: pointer; border-left: 4px solid var(--blue); background: var(--bg-card); transition: all 0.2s;" onclick="onboardingStep1()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div class="step-icon"><i class="ph ph-faders"></i></div>
+            <div class="step-content">
+              <div class="step-number" style="color: var(--blue); font-weight: 600;">Step 1</div>
+              <h3 style="margin: 4px 0 8px 0;">Configure Rules</h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Set up categorization rules to automate your transaction tracking.</p>
+              <button class="btn btn-blue" style="margin-top: 16px; width: fit-content;">Start Configuration</button>
+            </div>
+          </div>
+      `;
+
+      var step2HTML = step2Completed ? `
+          <div class="step-card" style="cursor: pointer; border-left: 4px solid #10b981; background: var(--bg-card); transition: all 0.2s;" onclick="onboardingStep2()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div class="step-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;"><i class="ph ph-check-circle"></i></div>
+            <div class="step-content">
+              <div class="step-number" style="color: #10b981; font-weight: 600;">Step 2 Completed</div>
+              <h3 style="margin: 4px 0 8px 0;">Upload Statement</h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">You have successfully imported your bank statement.</p>
+              <button class="btn btn-outline" style="margin-top: 16px; width: fit-content; border-color: #10b981; color: #10b981;">Upload Another</button>
+            </div>
+          </div>
+      ` : (step1Completed ? `
+          <div class="step-card" style="cursor: pointer; border-left: 4px solid var(--blue); background: var(--bg-card); transition: all 0.2s;" onclick="onboardingStep2()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div class="step-icon"><i class="ph ph-cloud-arrow-up"></i></div>
+            <div class="step-content">
+              <div class="step-number" style="color: var(--blue); font-weight: 600;">Step 2</div>
+              <h3 style="margin: 4px 0 8px 0;">Upload Statement</h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Import your first bank statement safely and securely.</p>
+              <button class="btn btn-blue" style="margin-top: 16px; width: fit-content;">Upload Now</button>
+            </div>
+          </div>
+      ` : `
+          <div class="step-card" style="opacity: 0.6; pointer-events: none; background: var(--bg-card);">
+            <div class="step-icon"><i class="ph ph-cloud-arrow-up"></i></div>
+            <div class="step-content">
+              <div class="step-number">Step 2</div>
+              <h3 style="margin: 4px 0 8px 0; display: flex; align-items: center; gap: 8px;">Upload Statement <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary);"><i class="ph ph-lock"></i> Locked</span></h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Import your first bank statement safely and securely.</p>
+            </div>
+          </div>
+      `);
+
+      var step3HTML = step2Completed ? `
+          <div class="step-card" style="cursor: pointer; border-left: 4px solid var(--blue); background: var(--bg-card); transition: all 0.2s;" onclick="onboardingStep3()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div class="step-icon"><i class="ph ph-magnifying-glass"></i></div>
+            <div class="step-content">
+              <div class="step-number" style="color: var(--blue); font-weight: 600;">Step 3</div>
+              <h3 style="margin: 4px 0 8px 0;">Review Transactions</h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Verify and categorize your ${pending.length} imported transactions.</p>
+              <button class="btn btn-blue" style="margin-top: 16px; width: fit-content;">Review Now</button>
+            </div>
+          </div>
+      ` : `
+          <div class="step-card" style="opacity: 0.6; pointer-events: none; background: var(--bg-card);">
+            <div class="step-icon"><i class="ph ph-magnifying-glass"></i></div>
+            <div class="step-content">
+              <div class="step-number">Step 3</div>
+              <h3 style="margin: 4px 0 8px 0; display: flex; align-items: center; gap: 8px;">Review Transactions <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary);"><i class="ph ph-lock"></i> Locked</span></h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Verify and categorize your imported transactions.</p>
+            </div>
+          </div>
+      `;
+
+      var step4HTML = step2Completed ? `
+          <div class="step-card" style="cursor: pointer; border-left: 4px solid var(--blue); background: var(--bg-card); transition: all 0.2s;" onclick="onboardingStep4()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div class="step-icon"><i class="ph ph-check-square"></i></div>
+            <div class="step-content">
+              <div class="step-number" style="color: var(--blue); font-weight: 600;">Step 4</div>
+              <h3 style="margin: 4px 0 8px 0;">Confirm Transactions</h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Approve your transactions to permanently unlock your dashboard.</p>
+              <button class="btn btn-blue" style="margin-top: 16px; width: fit-content;">Confirm Now</button>
+            </div>
+          </div>
+      ` : `
+          <div class="step-card" style="opacity: 0.6; pointer-events: none; background: var(--bg-card);">
+            <div class="step-icon"><i class="ph ph-check-square"></i></div>
+            <div class="step-content">
+              <div class="step-number">Step 4</div>
+              <h3 style="margin: 4px 0 8px 0; display: flex; align-items: center; gap: 8px;">Confirm Transactions <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary);"><i class="ph ph-lock"></i> Locked</span></h3>
+              <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Approve your transactions to permanently unlock your dashboard.</p>
+            </div>
+          </div>
+      `;
+
+      document.getElementById('pg-dash-body').innerHTML = `
+      <div style="padding: 32px; max-width: 800px; margin: 0 auto; animation: fade-in 0.3s ease;">
+        <h2 style="font-size: 28px; color: var(--text-primary); margin-bottom: 8px;">Welcome to The FinTracker</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 32px; font-size: 15px; line-height: 1.6;">Welcome aboard! Complete the following onboarding steps to configure your account and unlock your financial dashboard.</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          ${step1HTML}
+          ${step2HTML}
+          ${step3HTML}
+          ${step4HTML}
+        </div>
+      </div>
+      `;
+      return;
+    }
+
     var d=getMonthYear();
     
     var oA=0,oL=0,tA=0,tL=0;
@@ -944,7 +1099,10 @@ function renderNetWorth() {
       if(dObj < earliest) earliest = dObj;
     };
     
-    at.forEach(function(t){ updateDelta(t.year, t.month, 0); }); // Just to register month
+    at.forEach(function(t){ 
+      if (t.month !== undefined && t.year !== undefined) updateDelta(t.year, t.month, 0); 
+      else { var d = getMonthYearFromDate(t.date); updateDelta(d.y, d.m, 0); }
+    }); // Just to register month
     as.forEach(function(s){ updateDelta(s.year, s.month, 0); });
     
     Object.keys(monthDeltas).forEach(function(k) {
@@ -1002,7 +1160,7 @@ function renderNetWorth() {
          dataNW.push(0); // If before earliest
       }
       pM++;
-      if(pM>12){ pM=1; cY++; }
+      if(pM>12){ pM=1; pY++; }
     }
     
     var html = '<div style="display:grid;grid-template-columns:1fr;gap:1.5rem;margin-bottom:1.5rem">';
