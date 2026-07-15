@@ -225,14 +225,14 @@ body {
 .btn:hover { background: rgba(255,255,255,0.05); border-color: var(--border-hover); }
 
 .btn-google {
-  background: #fff;
-  color: #3c4043;
-  border: 1px solid #dadce0;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
 }
 .btn-google:hover {
-  background: #f8f9fa;
-  border-color: #d2e3fc;
-  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3);
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-hover);
+  box-shadow: none;
 }
 
 .auth-divider {
@@ -791,13 +791,21 @@ table.data-tbl input[type=date] {
 .auth-nav { padding: 1.5rem 3rem; display: flex; justify-content: space-between; align-items: center; }
 .auth-trust { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #94a3b8; }
 .auth-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
-.auth-panel { background: #151a22; border: 1px solid #2a2f3a; border-radius: 12px; width: 100%; max-width: 440px; padding: 2.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+.auth-panel { background: #151a22; border: 1px solid #2a2f3a; border-radius: 16px; width: 100%; max-width: 650px; padding: 3.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
 .auth-panel h3 { font-size: 28px; font-weight: 700; margin-bottom: 0.5rem; text-align: center; }
 .auth-sub { text-align: center; color: #94a3b8; font-size: 15px; margin-bottom: 2rem; }
 .auth-form { display: flex; flex-direction: column; gap: 1rem; }
 .auth-form .field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 6px; display: block; }
 .auth-form .field input { background: #0a0f18; border: 1px solid #2a2f3a; color: #fff; border-radius: 6px; padding: 12px 14px; font-size: 15px; width: 100%; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
 .auth-form .field input:focus { border-color: #3b82f6; }
+.auth-form .field input:-webkit-autofill,
+.auth-form .field input:-webkit-autofill:hover, 
+.auth-form .field input:-webkit-autofill:focus, 
+.auth-form .field input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #0a0f18 inset !important;
+  -webkit-text-fill-color: #fff !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
 .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .auth-agree { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #94a3b8; margin-top: 0.5rem; margin-bottom: 0.5rem; }
 .btn-block { width: 100%; padding: 14px; font-size: 15px; }
