@@ -902,7 +902,7 @@ function renderSummary() {
     html += '</div>';
 
     // Bottom Row: Category Breakdown + Investment Suggestions
-    html += '<div style="display:grid;grid-template-columns:1fr 2fr;gap:1.5rem">';
+    html += '<div class="summary-bottom-row" style="display:grid;grid-template-columns:1fr 2fr;gap:1.5rem">';
     
     // Category Breakdown
     html += '<div class="section" style="margin:0"><div class="sec-title">Category Breakdown</div>';
@@ -1169,10 +1169,10 @@ function renderNetWorth() {
     
     // GROWTH CHART & NET WORTH
     html += '<div class="section" style="margin:0;display:flex;flex-direction:column">'
-      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem">'
+      +'<div class="nw-header" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem">'
       +'<div><div style="font-size:11px;color:var(--text-secondary);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Current Net Worth</div>'
       +'<div style="font-size:36px;font-weight:700;color:var(--text-primary);line-height:1.2">'+(nw.netWorth<0?'-':'')+fmt(Math.abs(nw.netWorth))+'</div></div>'
-      +'<div style="display:flex;gap:4px">'
+      +'<div class="nw-period-btns" style="display:flex;gap:4px;flex-wrap:wrap">'
       +['1M','3M','6M','1Y','5Y','ALL'].map(function(p){
          return '<button class="btn btn-sm" style="border-radius:12px;font-size:10px;'+(nwChartPeriod===p?'background:#a5b4fc;color:#1e1b4b':'')+'" onclick="nwChartPeriod=\''+p+'\';renderNetWorth()">'+p+'</button>';
       }).join('')
