@@ -344,13 +344,15 @@ function switchTab(t) {
   else if (t==='rules')    renderRules();
   else if (t==='upload')   renderUpload();
   
-  if (window.innerWidth <= 600) {
+  if (window.innerWidth <= 1024) {
     $('sidebar').classList.remove('show');
+    if ($('sidebar-backdrop')) $('sidebar-backdrop').classList.add('hide');
   }
 }
 
 function toggleSidebar() {
   $('sidebar').classList.toggle('show');
+  if ($('sidebar-backdrop')) $('sidebar-backdrop').classList.toggle('hide');
 }
 
 function toggleGroup(id) {
