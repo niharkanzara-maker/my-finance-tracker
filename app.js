@@ -16,9 +16,26 @@ firebase.initializeApp(firebaseConfig);
 var auth = firebase.auth();
 
 // ── SUPABASE ──
+const customFetch = async (url, options) => {
+  options = options || {};
+  let headers = new Headers(options.headers || {});
+  
+  if (auth.currentUser) {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      headers.set('Authorization', `Bearer ${token}`);
+    } catch (e) {
+      console.error("Error getting Firebase token:", e);
+    }
+  }
+  
+  return fetch(url, { ...options, headers: headers });
+};
+
 var sb = window.supabase.createClient(
   'https://ktbugezdzcrpuzrfnsbq.supabase.co',
-  'sb_publishable_iOfsjV23yTBSeaziqfaZDw_rF-Xiz3M'
+  'sb_publishable_iOfsjV23yTBSeaziqfaZDw_rF-Xiz3M',
+  { global: { fetch: customFetch } }
 );
 
 // ── PDF.JS ──
@@ -324,13 +341,14 @@ function switchTab(t) {
     'summary': 'Monthly Summary',
     'networth': 'Net Worth Monitoring',
     'annual': 'Annual Analysis',
+    'accounts': 'Accounts',
     'rules': 'Categorization Rules',
     'upload': 'Upload Statement'
   };
   var titleEl = $('page-title');
   if(titleEl) titleEl.textContent = titles[t] || 'Dashboard';
 
-  ['txn','snapshot','summary','networth','annual','rules','upload'].forEach(function(x) {
+  ['txn','snapshot','summary','networth','annual','accounts','rules','upload'].forEach(function(x) {
     var el = $('tab-'+x);
     if (el) el.classList.toggle('active', x===t);
   });
@@ -341,6 +359,7 @@ function switchTab(t) {
   else if (t==='summary')  renderSummary();
   else if (t==='networth') renderNetWorth();
   else if (t==='annual')   renderAnnual();
+  else if (t==='accounts') renderAccounts();
   else if (t==='rules')    renderRules();
   else if (t==='upload')   renderUpload();
   
@@ -409,7 +428,14 @@ function saveRulesToDB(rules) {
   return sb.from('rules').delete().eq('user_id',currentUser.id).then(function() {
     if (!rules.length) return;
     return sb.from('rules').insert(rules.map(function(r) {
-      return { user_id:currentUser.id, keyword:r.keyword, category:r.cat, subcategory:r.subcat };
+      return { 
+        user_id: currentUser.id, 
+        keyword: r.keyword, 
+        category: r.cat, 
+        subcategory: r.subcat,
+        applies_to_all_accounts: r.appliesToAll,
+        account_id: r.accountId
+      };
     }));
   });
 }
@@ -1338,19 +1364,96 @@ function renderAnnual() {
 
 function jumpMonth(m){ _curMonth=m; switchTab('txn'); }
 
+// ================== ACCOUNTS MODULE ==================
+function getAccounts() {
+  return sb.from('accounts').select('*').eq('user_id', currentUser.id)
+    .then(function(res) { return res.data || []; });
+}
+
+function renderAccounts() {
+  showLoading('Loading accounts...');
+  getAccounts().then(function(accounts) {
+    var html = '<div class="section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem"><div class="sec-title" style="margin:0">Accounts</div><button class="btn btn-blue btn-sm" onclick="openAccountModal()">+ Add Account</button></div>';
+    
+    if(!accounts.length) {
+      html += '<div class="empty"><div class="empty-icon">🏦</div>No accounts found. Create one to get started.</div></div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:1rem;">';
+      accounts.forEach(function(acc) {
+        var statusColor = acc.status === 'Active' ? 'var(--green)' : 'var(--text-secondary)';
+        var bName = acc.bank_name==='kotak'?'Kotak Mahindra Bank':(acc.bank_name==='sbi'?'State Bank of India':(acc.bank_name==='hdfc'?'HDFC Bank':acc.bank_name));
+        html += '<div style="background:var(--bg-input);padding:1.25rem;border-radius:8px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">'
+          + '<div>'
+          + '<div style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:4px">🏦 ' + acc.account_name + '</div>'
+          + '<div style="font-size:13px;color:var(--text-secondary);display:flex;gap:16px;">'
+          + '<span><b>Bank:</b> ' + bName + '</span>'
+          + '<span><b>Type:</b> ' + acc.account_type + '</span>'
+          + '<span><b>Status:</b> <span style="color:'+statusColor+'">' + acc.status + '</span></span>'
+          + '</div></div>'
+          + '<div style="display:flex;gap:8px;">'
+          + '<button class="btn btn-outline btn-sm" onclick="openAccountModal(\''+acc.id+'\',\''+encodeURIComponent(acc.account_name)+'\',\''+acc.bank_name+'\',\''+acc.account_type+'\',\''+acc.status+'\')">Edit</button>'
+          + '<button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="deleteAccount(\''+acc.id+'\')"><i class="ph ph-trash"></i></button>'
+          + '</div></div>';
+      });
+      html += '</div></div>';
+    }
+    $('pg-dash-body').innerHTML = html;
+  });
+}
+
+function openAccountModal(id, name, bank, type, status) {
+  var msg = $('acc-msg');
+  if(msg) { msg.innerHTML = ''; msg.className = 'msg'; }
+  var t = $('account-modal-title');
+  if(t) t.innerText = id ? 'Edit Account' : 'Add Account';
+  if($('acc-id')) $('acc-id').value = id || '';
+  if($('acc-name')) $('acc-name').value = name ? decodeURIComponent(name) : '';
+  if($('acc-bank')) $('acc-bank').value = bank || 'kotak';
+  if($('acc-type')) $('acc-type').value = type || 'Savings';
+  if($('acc-status')) $('acc-status').value = status || 'Active';
+  if($('modal-account')) $('modal-account').classList.remove('hide');
+}
+
+function saveAccount() {
+  var id = $('acc-id').value;
+  var name = $('acc-name').value.trim();
+  var bank = $('acc-bank').value;
+  var type = $('acc-type').value;
+  var status = $('acc-status').value;
+  
+  if(!name) { setMsg($('acc-msg'), 'err', 'Account Name is required.'); return; }
+  
+  var payload = { account_name: name, bank_name: bank, account_type: type, status: status, user_id: currentUser.id };
+  var p;
+  if(id) { p = sb.from('accounts').update(payload).eq('id', id); }
+  else { p = sb.from('accounts').insert([payload]); }
+  
+  p.then(function(res) {
+    if(res.error) { setMsg($('acc-msg'), 'err', res.error.message); return; }
+    $('modal-account').classList.add('hide');
+    if($('tab-accounts') && $('tab-accounts').classList.contains('active')) renderAccounts();
+  });
+}
+
+function deleteAccount(id) {
+  if(!confirm('Are you sure you want to delete this account?')) return;
+  sb.from('accounts').delete().eq('id', id).then(function() {
+    renderAccounts();
+  });
+}
+
 // ── TAB 5: MY RULES ──
 function renderRules() {
-  showLoading('Loading rules…');
-  getRules().then(function(rules) {
+  showLoading('Loading rules...');
+  Promise.all([getRules(), getAccounts()]).then(function(res) {
+    var rules = res[0];
+    var accounts = res[1];
+    window._cachedAccounts = accounts;
+    
     var html='<div class="section"><div class="sec-title">My keyword rules</div>'
       +'<p style="font-size:12px;color:#8892b0;margin-bottom:1rem;line-height:1.7">Keywords matched against bank statement descriptions for auto-categorization.</p>'
-      +'<div class="field" style="max-width:240px;margin-bottom:1rem"><label>Your bank</label><select id="rules-bank">'
-      +['kotak','hdfc','icici','sbi','axis','other'].map(function(b){
-        var name={'kotak':'Kotak Mahindra','hdfc':'HDFC Bank','icici':'ICICI Bank','sbi':'State Bank (SBI)','axis':'Axis Bank','other':'Other Bank'}[b];
-        return'<option value="'+b+'" '+((currentProfile.bank||'kotak')===b?'selected':'')+'>'+name+'</option>';
-      }).join('')+'</select></div>'
       +'<div style="overflow-x:auto"><table class="rules-tbl"><thead><tr>'
-      +'<th style="width:36%">Keyword</th><th style="width:22%">Category</th><th style="width:28%">Sub-category</th><th style="width:14%"></th>'
+      +'<th style="width:25%">Keyword</th><th style="width:20%">Category</th><th style="width:25%">Sub-category</th><th style="width:20%">Applies To</th><th style="width:10%"></th>'
       +'</tr></thead><tbody id="rules-body"></tbody></table></div>'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:.85rem">'
       +'<button class="btn btn-sm" onclick="addRuleRow()">+ Add row</button>'
@@ -1359,19 +1462,31 @@ function renderRules() {
     $('pg-dash-body').innerHTML=html;
     var tbody=$('rules-body');
     if(!rules.length){addRuleRow();return;}
-    rules.forEach(function(r){addRuleRow(r.keyword,r.category,r.subcategory);});
+    rules.forEach(function(r){
+      addRuleRow(r.keyword, r.category, r.subcategory, r.applies_to_all_accounts, r.account_id);
+    });
   });
 }
 
-function addRuleRow(kw,cat,subcat){
+function addRuleRow(kw, cat, subcat, appliesToAll, accountId){
   kw=kw||'';cat=cat||'';subcat=subcat||'';
   var tbody=$('rules-body'),tr=document.createElement('tr');
   var subOpts=getSubcatOptionsHTML(cat, subcat);
+  
+  var accOpts = '<option value="all" '+(appliesToAll !== false ? 'selected' : '')+'>All Accounts</option>';
+  if (window._cachedAccounts) {
+    window._cachedAccounts.forEach(function(a) {
+      var isSel = (appliesToAll === false && accountId === a.id) ? 'selected' : '';
+      accOpts += '<option value="'+a.id+'" '+isSel+'>'+a.account_name+'</option>';
+    });
+  }
+  
   tr.innerHTML='<td><input type="text" placeholder="e.g. SWIGGY, SALARY" value="'+kw+'" style="text-transform:uppercase"></td>'
     +'<td><select onchange="updateSubInRow(this)"><option value="">Select</option>'
     +Object.keys(CAT_MAP).map(function(c){return'<option '+(c===cat?'selected':'')+'>'+c+'</option>';}).join('')
     +'</select></td>'
     +'<td><select onchange="handleSubcatChange(this, this.closest(\'tr\').cells[1].querySelector(\'select\').value)">'+subOpts+'</select></td>'
+    +'<td><select>'+accOpts+'</select></td>'
     +'<td><button class="btn btn-outline" style="padding:6px;border-color:var(--border);color:var(--text-secondary)" onclick="this.closest(\'tr\').remove()"><i class="ph ph-trash"></i></button></td>';
   tbody.appendChild(tr);
 }
@@ -1381,8 +1496,18 @@ function updateSubInRow(sel){
 }
 function saveRules(){
   var rows=[].slice.call($('rules-body').querySelectorAll('tr'));
-  var rules=rows.map(function(tr){return{keyword:tr.cells[0].querySelector('input').value.trim().toUpperCase(),cat:tr.cells[1].querySelector('select').value,subcat:tr.cells[2].querySelector('select').value};}).filter(function(r){return r.keyword&&r.cat;});
-  sb.from('profiles').update({bank:$('rules-bank').value}).eq('id',currentUser.id);
+  var rules=rows.map(function(tr){
+    var accVal = tr.cells[3].querySelector('select').value;
+    var appliesToAll = accVal === 'all';
+    var accountId = appliesToAll ? null : accVal;
+    return{
+      keyword:tr.cells[0].querySelector('input').value.trim().toUpperCase(),
+      cat:tr.cells[1].querySelector('select').value,
+      subcat:tr.cells[2].querySelector('select').value,
+      appliesToAll: appliesToAll,
+      accountId: accountId
+    };
+  }).filter(function(r){return r.keyword&&r.cat;});
   saveRulesToDB(rules).then(function(){setMsg($('rules-msg'),'ok',rules.length+' rules saved!');});
 }
 
@@ -1819,34 +1944,44 @@ function deleteSplitGroup(groupId) {
   sb.from('transactions').delete().eq('split_group_id', groupId).then(function(){ renderTxn(); });
 }
 
-
-
 // --- UNIFIED UPLOAD V2 OVERRIDES ---
 window.renderUpload = function() {
   var pg = document.getElementById('pg-dash-body');
   if(!pg) return;
   
-  var cy = new Date().getFullYear();
-  var ys = '<option value="all">All Years</option>'; for(var y=cy; y>=cy-5; y--) ys += '<option value="'+y+'">'+y+'</option>';
-  
-  pg.innerHTML = '<div class="section"><div class="sec-title">Upload bank statement</div>'
-    +'<p style="font-size:12px;color:#8892b0;margin-bottom:1.25rem;line-height:1.7">Upload your CSV or Excel statement.</p>'
-    +'<div style="margin-bottom: 1rem;"><label style="font-size: 13px; color:#ccd6f6; margin-right: 10px;">Select Bank:</label>'
-    +'<select id="bank-selector" style="padding: 6px 12px; border-radius: 4px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border);">'
-    +'<option value="kotak">Kotak Mahindra Bank</option><option value="sbi">SBI</option><option value="hdfc">HDFC Bank</option></select></div>'
-    +'<div class="upload-zone" id="zone-unified" style="border: 2px dashed #233554; padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px; max-width: 600px; margin: 0 auto;"><div class="u-ico" style="margin-bottom: 0.5rem;"><i class="ph ph-folder-open" style="font-size:32px;color:var(--text-secondary)"></i></div><p>Click or drag to select <b>CSV or Excel statement</b></p></div>'
-    +'<input type="file" id="file-unified" accept=".csv,.xlsx,.xls" style="display:none">'
-    +'<div class="msg" id="upload-msg" style="margin-top:.75rem;font-size:13px"></div></div>'
-    +'<div id="confirm-sec" style="display:none"><div class="section">'
-    +'<div class="sec-title" style="display:flex; justify-content:space-between; align-items:center;">'
-    +'  <span>Review & Confirm Uploaded transactions <span id="txn-count" style="font-size:12px;color:#8892b0;font-weight:400;margin-left:8px;"></span></span>'
-    +'  <div><button class="btn btn-outline" id="btn-del-selected" style="padding: 6px 16px; font-size:13px; margin-right:8px; display:none; border-color:#ef4444; color:#ef4444;" onclick="deleteSelectedPending()">Delete Selected</button>'
-    +'  <button class="btn btn-green" id="btn-confirm-all" style="padding: 6px 16px; font-size:13px; opacity: 0.5; pointer-events: none;" onclick="confirmSelectedPending()">Confirm Selected (0)</button></div>'
-    +'</div>'
-    +'<p style="font-size:12px;color:#8892b0;margin-bottom:1.5rem"><span style="color:#ff6b6b">■</span> Orange rows = unmatched - please select a category.</p>'
-    +'<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:1.5rem">'
-    +'<div style="display:flex; gap:16px; margin-bottom:1.5rem; align-items:end; flex-wrap:wrap;">'
-    +'  <div class="field" style="width:200px;"><label>Month</label><div style="position:relative"><i class="ph ph-calendar-blank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
+  showLoading('Loading accounts...');
+  getAccounts().then(function(accounts) {
+    if(!accounts.length) {
+      pg.innerHTML = '<div class="section"><div class="empty"><div class="empty-icon">🏦</div>No accounts found. Please add an Account in the Accounts tab before uploading statements.</div></div>';
+      return;
+    }
+    
+    var cy = new Date().getFullYear();
+    var ys = '<option value="all">All Years</option>'; for(var y=cy; y>=cy-5; y--) ys += '<option value="'+y+'">'+y+'</option>';
+    
+    var accOptions = '';
+    accounts.forEach(function(a) {
+      accOptions += '<option value="'+a.id+'" data-bank="'+a.bank_name+'">'+a.account_name+'</option>';
+    });
+    
+    pg.innerHTML = '<div class="section"><div class="sec-title">Upload bank statement</div>'
+      +'<p style="font-size:12px;color:#8892b0;margin-bottom:1.25rem;line-height:1.7">Upload your CSV or Excel statement.</p>'
+      +'<div style="margin-bottom: 1rem;"><label style="font-size: 13px; color:#ccd6f6; margin-right: 10px;">Select Account:</label>'
+      +'<select id="bank-selector" style="padding: 6px 12px; border-radius: 4px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border);">'
+      + accOptions + '</select></div>'
+      +'<div class="upload-zone" id="zone-unified" style="border: 2px dashed #233554; padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px; max-width: 600px; margin: 0 auto;"><div class="u-ico" style="margin-bottom: 0.5rem;"><i class="ph ph-folder-open" style="font-size:32px;color:var(--text-secondary)"></i></div><p>Click or drag to select <b>CSV or Excel statement</b></p></div>'
+      +'<input type="file" id="file-unified" accept=".csv,.xlsx,.xls" style="display:none">'
+      +'<div class="msg" id="upload-msg" style="margin-top:.75rem;font-size:13px"></div></div>'
+      +'<div id="confirm-sec" style="display:none"><div class="section">'
+      +'<div class="sec-title" style="display:flex; justify-content:space-between; align-items:center;">'
+      +'  <span>Review & Confirm Uploaded transactions <span id="txn-count" style="font-size:12px;color:#8892b0;font-weight:400;margin-left:8px;"></span></span>'
+      +'  <div><button class="btn btn-outline" id="btn-del-selected" style="padding: 6px 16px; font-size:13px; margin-right:8px; display:none; border-color:#ef4444; color:#ef4444;" onclick="deleteSelectedPending()">Delete Selected</button>'
+      +'  <button class="btn btn-green" id="btn-confirm-all" style="padding: 6px 16px; font-size:13px; opacity: 0.5; pointer-events: none;" onclick="confirmSelectedPending()">Confirm Selected (0)</button></div>'
+      +'</div>'
+      +'<p style="font-size:12px;color:#8892b0;margin-bottom:1.5rem"><span style="color:#ff6b6b">■</span> Orange rows = unmatched - please select a category.</p>'
+      +'<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:1.5rem">'
+      +'<div style="display:flex; gap:16px; margin-bottom:1.5rem; align-items:end; flex-wrap:wrap;">'
+      +'  <div class="field" style="width:200px;"><label>Month</label><div style="position:relative"><i class="ph ph-calendar-blank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
     +'    <select id="pend-month" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 36px;appearance:none;color:var(--text-primary);"><option value="all">All Months</option><option value="01">January</option><option value="02">February</option><option value="03">March</option><option value="04">April</option><option value="05">May</option><option value="06">June</option><option value="07">July</option><option value="08">August</option><option value="09">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select>'
     +'    <i class="ph ph-caret-down" style="position:absolute;right:12px;top:12px;color:var(--text-secondary);pointer-events:none"></i></div></div>'
     +'  <div class="field" style="width:200px;"><label>Year</label><div style="position:relative"><i class="ph ph-calendar-blank" style="position:absolute;left:12px;top:12px;color:var(--text-secondary)"></i>'
@@ -1898,16 +2033,19 @@ window.renderUpload = function() {
   }
   
   fetchPendingTxns();
+  });
 };
 
 window.handleUnifiedFile = function(file) {
   var ext = file.name.split('.').pop().toLowerCase();
-  var bank = document.getElementById('bank-selector').value;
+  var sel = document.getElementById('bank-selector');
+  var accountId = sel.value;
+  var bankCode = sel.options[sel.selectedIndex].getAttribute('data-bank');
   setMsg(document.getElementById('upload-msg'), 'info', 'Parsing ' + file.name + '...');
 
   if(ext === 'csv') {
     var reader = new FileReader();
-    reader.onload = function(e) { processParsedResult(e.target.result, bank, 'csv'); };
+    reader.onload = function(e) { processParsedResult(e.target.result, accountId, bankCode, 'csv'); };
     reader.readAsText(file);
   } else if (ext === 'xlsx' || ext === 'xls') {
     if(typeof XLSX === 'undefined') { setMsg(document.getElementById('upload-msg'), 'err', 'Excel parser missing.'); return; }
@@ -1917,7 +2055,7 @@ window.handleUnifiedFile = function(file) {
       try {
         var workbook = XLSX.read(data, {type: 'array'});
         var csv = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
-        processParsedResult(csv, bank, 'excel');
+        processParsedResult(csv, accountId, bankCode, 'excel');
       } catch (err) {
         var errStr = (err.message || '').toLowerCase();
         if(errStr.includes('password') || errStr.includes('encrypt') || errStr.includes('cfb')) {
@@ -1948,18 +2086,14 @@ window.handleUnifiedFile = function(file) {
               return;
             }
             
-            // Decode decrypted base64 back to Uint8Array
-            var decBinary = atob(res.data.decryptedFileBase64);
-            var decData = new Uint8Array(decBinary.length);
-            for(var j=0; j<decBinary.length; j++) {
-              decData[j] = decBinary.charCodeAt(j);
-            }
-            
             try {
-              var decWb = XLSX.read(decData, {type: 'array'});
+              var decBin = atob(res.data.csvBase64 || res.data.excelBase64);
+              var decArr = new Uint8Array(decBin.length);
+              for(var k=0; k<decBin.length; k++) { decArr[k] = decBin.charCodeAt(k); }
+              var decWb = XLSX.read(decArr, {type: 'array'});
               var decCsv = XLSX.utils.sheet_to_csv(decWb.Sheets[decWb.SheetNames[0]]);
               setMsg(document.getElementById('upload-msg'), 'info', 'File decrypted successfully! Parsing...');
-              processParsedResult(decCsv, bank, 'excel');
+              processParsedResult(decCsv, accountId, bankCode, 'excel');
             } catch(e2) {
                setMsg(document.getElementById('upload-msg'), 'err', 'Failed to read decrypted file content.');
             }
@@ -1977,7 +2111,7 @@ window.handleUnifiedFile = function(file) {
   }
 };
 
-window.processParsedResult = function(csvString, bank, type) {
+window.processParsedResult = function(csvString, accountId, bankCode, type) {
   var lines = [];
   var currentLine = '';
   var inQGlobal = false;
@@ -2001,7 +2135,7 @@ window.processParsedResult = function(csvString, bank, type) {
   var latestBal = 0;
   
   var sel = document.getElementById('bank-selector');
-  var bankPretty = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : bank;
+  var bankPretty = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : bankCode;
 
   for(var i=0; i<lines.length; i++) {
     var line = lines[i].trim();
@@ -2016,13 +2150,12 @@ window.processParsedResult = function(csvString, bank, type) {
     cols.push(val.trim());
     var lc = line.toLowerCase();
     if(!foundHeader) {
-      if(bank === 'kotak' && lc.includes('sl') && lc.includes('description')) { foundHeader = true; }
-      else if (bank === 'sbi' && lc.includes('date') && (lc.includes('narration') || lc.includes('description') || lc.includes('particulars') || lc.includes('details'))) { foundHeader = true; }
-      else if (bank === 'hdfc' && lc.includes('date') && lc.includes('narration')) { foundHeader = true; }
+      if(bankCode === 'kotak' && lc.includes('sl') && lc.includes('description')) { foundHeader = true; }
+      else if (bankCode === 'sbi' && lc.includes('date') && (lc.includes('narration') || lc.includes('description') || lc.includes('particulars') || lc.includes('details'))) { foundHeader = true; }
+      else if (bankCode === 'hdfc' && lc.includes('date') && lc.includes('narration')) { foundHeader = true; }
       continue;
     }
-    if(bank === 'kotak' && cols.length >= 9) {
-      // 0: Sl No, 1: Transaction date, 2: Value Date, 3: Description, 4: Chq/Ref, 5: Amount, 6: Dr/Cr, 7: Balance, 8: Dr/Cr
+    if(bankCode === 'kotak' && cols.length >= 9) {
       var dateStr = cols[2].trim();
       var desc = cols[3].trim();
       var amtStr = cols[5] ? cols[5].replace(/,/g,'') : '0';
@@ -2038,12 +2171,11 @@ window.processParsedResult = function(csvString, bank, type) {
         var mm = dateParts[1].padStart(2, '0');
         var dd = dateParts[0].padStart(2, '0');
         var date = yy + '-' + mm + '-' + dd;
-        if(amt > 0) txns.push({date: date, desc: desc, amount: amt, type: tType, bank_name: bankPretty});
+        if(amt > 0) txns.push({date: date, desc: desc, amount: amt, type: tType, bank_name: bankPretty, account_id: accountId});
       }
-    } else if (bank === 'sbi' && cols.length >= 5) {
+    } else if (bankCode === 'sbi' && cols.length >= 5) {
       var dateStr = cols[0] ? cols[0].trim() : '';
       var desc = cols[1] ? cols[1].trim() : '';
-      // Sometimes Ref No is missing, so we check if Col 2 or 3 is the Debit column by looking at what contains the balance
       var dr = parseFloat(cols[3] ? cols[3].replace(/,/g,'') : '0');
       var cr = parseFloat(cols[4] ? cols[4].replace(/,/g,'') : '0');
       var bal = parseFloat(cols[5] ? cols[5].replace(/,/g,'') : '0');
@@ -2056,10 +2188,10 @@ window.processParsedResult = function(csvString, bank, type) {
         var yStr = dateParts[2].length === 2 ? '20'+dateParts[2] : dateParts[2];
         var parsedDate = yStr+'-'+mStr+'-'+dateParts[0].padStart(2, '0');
         var amt = dr > 0 ? dr : cr;
-        if(amt > 0) txns.push({date: parsedDate, desc: desc, amount: amt, type: dr>0?'Withdrawal':'Deposit', bank_name: bankPretty});
+        if(amt > 0) txns.push({date: parsedDate, desc: desc, amount: amt, type: dr>0?'Withdrawal':'Deposit', bank_name: bankPretty, account_id: accountId});
         if(bal > 0 && parsedDate > latestDate) { latestDate = parsedDate; latestBal = bal; }
       }
-    } else if (bank === 'hdfc' && cols.length >= 7) {
+    } else if (bankCode === 'hdfc' && cols.length >= 7) {
       var dateStr = cols[0] ? cols[0].trim() : '';
       var desc = cols[1] ? cols[1].trim() : '';
       var dr = parseFloat(cols[4] ? cols[4].replace(/,/g,'') : '0');
@@ -2074,7 +2206,7 @@ window.processParsedResult = function(csvString, bank, type) {
         var yStr = dateParts[2].length === 2 ? '20'+dateParts[2] : dateParts[2];
         var parsedDate = yStr+'-'+mStr+'-'+dateParts[0].padStart(2, '0');
         var amt = dr > 0 ? dr : cr;
-        if(amt > 0) txns.push({date: parsedDate, desc: desc, amount: amt, type: dr>0?'Withdrawal':'Deposit', bank_name: bankPretty});
+        if(amt > 0) txns.push({date: parsedDate, desc: desc, amount: amt, type: dr>0?'Withdrawal':'Deposit', bank_name: bankPretty, account_id: accountId});
         if(bal > 0 && parsedDate > latestDate) { latestDate = parsedDate; latestBal = bal; }
       }
     }
@@ -2082,27 +2214,29 @@ window.processParsedResult = function(csvString, bank, type) {
   if(txns.length > 0) {
     setMsg(document.getElementById('upload-msg'), 'info', 'Auto-categorizing ' + txns.length + ' txns...');
     getRules().then(function(rules) {
+      var accountRules = rules.filter(function(r) { return r.account_id === accountId; });
+      var globalRules = rules.filter(function(r) { return r.applies_to_all_accounts === true; });
+      var activeRules = accountRules.concat(globalRules);
+      
       for(var i=0; i<txns.length; i++) {
         var t = txns[i];
-        for (var j = 0; j < rules.length; j++) {
-          if (rules[j].keyword && typeof fuzzyMatch === 'function' && fuzzyMatch(t.desc, rules[j].keyword)) {
-            var cat = rules[j].category;
-            // Strict Validation
+        for (var j = 0; j < activeRules.length; j++) {
+          if (activeRules[j].keyword && typeof fuzzyMatch === 'function' && fuzzyMatch(t.desc, activeRules[j].keyword)) {
+            var cat = activeRules[j].category;
             if (cat === 'Income' && t.type !== 'Deposit') continue;
             if (cat === 'Expenses' && t.type !== 'Withdrawal') continue;
-            
             t.cat = cat;
-            t.subcat = rules[j].subcategory;
+            t.subcat = activeRules[j].subcategory;
             break;
-          } else if (rules[j].type === t.type && rules[j].keyword && t.desc.toLowerCase().includes(rules[j].keyword.toLowerCase())) {
-            t.cat = rules[j].category;
-            t.subcat = rules[j].subcategory;
+          } else if (activeRules[j].type === t.type && activeRules[j].keyword && t.desc.toLowerCase().includes(activeRules[j].keyword.toLowerCase())) {
+            t.cat = activeRules[j].category;
+            t.subcat = activeRules[j].subcategory;
             break;
           }
         }
       }
       autoCategorizeUpload(txns);
-      if((bank === 'sbi' || bank === 'hdfc') && latestBal > 0) {
+      if((bankCode === 'sbi' || bankCode === 'hdfc') && latestBal > 0) {
         var d = getMonthYear();
         var banner = '<div id="bal-banner" style="background:#0c2a1a;border:1px solid #1D9E75;border-radius:8px;padding:.85rem 1rem;margin-top:.75rem;font-size:13px;color:#e8eaf0">'
           +'<b style="color:#00d4a0">Bank balance detected: '+fmt(latestBal)+'</b><br>'
@@ -2125,7 +2259,7 @@ window.autoCategorizeUpload = function(txns) {
     return {
       user_id: currentUser.id, date: t.date, description: t.desc, amount: t.amount, type: t.type,
       category: t.cat || null, subcategory: t.subcat || null, status: 'PENDING', upload_batch_id: batchId,
-      bank_name: t.bank_name || null
+      bank_name: t.bank_name || null, account_id: t.account_id || null
     };
   });
   sb.from('transactions').insert(toInsert).then(function(res) {
