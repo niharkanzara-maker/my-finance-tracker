@@ -200,6 +200,7 @@
       <div class="nav-group">
         <div class="nav-group-title" onclick="toggleGroup('grp-auto')"><span>Configuration</span><span id="arr-grp-auto"><i class="ph ph-caret-down" style="font-size:14px;color:var(--text-secondary);transition:transform 0.2s;"></i></span></div>
         <div class="nav-group-items" id="grp-auto" style="display:flex;flex-direction:column;gap:4px">
+          <button class="tab" id="tab-accounts" onclick="switchTab('accounts')"><i class="ph ph-bank"></i> Accounts</button>
           <button class="tab" id="tab-rules" onclick="switchTab('rules')"><i class="ph ph-faders"></i> Categorization Rules</button>
         </div>
       </div>
@@ -349,7 +350,52 @@
 </div>
 
 <script src="app.js?v=3"></script>
+
+<!-- ADD ACCOUNT MODAL -->
+<div id="modal-account" class="modal hide">
+  <div class="modal-content" style="max-width: 450px;">
+    <div class="modal-header">
+      <h3 id="account-modal-title">Add Account</h3>
+      <button class="close-btn" onclick="$('modal-account').classList.add('hide')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block;margin-bottom:8px;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Account Name</label>
+        <input type="text" id="acc-name" class="input-field" placeholder="e.g. HDFC Salary Account">
+      </div>
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block;margin-bottom:8px;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Bank</label>
+        <select id="acc-bank" class="input-field">
+          <option value="kotak">Kotak Mahindra Bank</option>
+          <option value="sbi">State Bank of India</option>
+          <option value="hdfc">HDFC Bank</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block;margin-bottom:8px;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Account Type</label>
+        <select id="acc-type" class="input-field">
+          <option value="Savings">Savings Account</option>
+          <option value="Current">Current Account</option>
+          <option value="Credit Card">Credit Card</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block;margin-bottom:8px;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Status</label>
+        <select id="acc-status" class="input-field">
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+      <input type="hidden" id="acc-id">
+      <div class="msg" id="acc-msg"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="$('modal-account').classList.add('hide')">Cancel</button>
+      <button class="btn btn-blue" onclick="saveAccount()">Save Account</button>
+    </div>
+  </div>
+</div>
+
 <script src="append.js?v=1"></script>
 </body>
 </html>
-
